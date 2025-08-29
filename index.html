@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Marketing Command Center</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MSA Marketing Command Center</title>
   <link rel="stylesheet" href="style.css" />
 
   <!-- FullCalendar CSS -->
@@ -11,118 +11,318 @@
   
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Amiri:wght@400;700&family=Cinzel:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js for analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-  <!-- Bismillah -->
-  <div class="bismillah">بِسْمِ ٱللَّٰهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div>
-
-  <!-- Logo and Title -->
-  <header>
-    <img id="logo" src="msa_logo.png" alt="MSA Logo" />
-    <h1>UTMMSA 2025–2026</h1>
-    <h2 class="title">Marketing Command Center</h2>
-    <div class="ayah">
-      <p class="highlight">
-        وَقُلِ ٱعْمَلُوا۟ فَسَيَرَى ٱللَّهُ عَمَلَكُمْ وَرَسُولُهُۥ وَٱلْمُؤْمِنُونَ
-      </p>
-      <p class="citation">— Surah At-Tawbah 9:105</p>
+  <!-- Navigation Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-header">
+      <img id="logo" src="msa_logo.png" alt="MSA Logo" />
+      <h2>MSA Marketing</h2>
+      <div class="bismillah-sidebar">بِسْمِ ٱللَّٰهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div>
     </div>
-    <div class="header-controls">
-      <button id="toggle-mode">🌙 Toggle Night Mode</button>
-      <div id="api-status" class="api-status">🔄 Connecting to API...</div>
+    
+    <div class="nav-menu">
+      <a href="#dashboard" class="nav-item active" data-section="dashboard">
+        <span class="nav-icon">📊</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <a href="#events" class="nav-item" data-section="events">
+        <span class="nav-icon">📋</span>
+        <span class="nav-text">Events & Requests</span>
+      </a>
+      <a href="#calendar" class="nav-item" data-section="calendar">
+        <span class="nav-icon">📅</span>
+        <span class="nav-text">Calendar</span>
+      </a>
+      <a href="#analytics" class="nav-item" data-section="analytics">
+        <span class="nav-icon">📈</span>
+        <span class="nav-text">Analytics</span>
+      </a>
+      <a href="#team" class="nav-item" data-section="team">
+        <span class="nav-icon">👥</span>
+        <span class="nav-text">Team</span>
+      </a>
+      <a href="#tools" class="nav-item" data-section="tools">
+        <span class="nav-icon">🛠️</span>
+        <span class="nav-text">Tools</span>
+      </a>
     </div>
-    <div id="api-error" class="api-error" style="display: none;"></div>
-  </header>
-
-  <!-- Quick Links -->
-  <div class="collapsibles">
-    <button class="collapsible">📎 Quick Links</button>
-    <div class="content">
-      <a class="link-button" href="https://www.lensbridge.tech/" target="_blank">🔗 LensBridge</a>
-      <a class="link-button" href="https://www.notion.so/utmmsa2023-24/25-26-20793a1f50b3802fa699ea4681c955b5" target="_blank">🧭 MSA Notion</a>
-      <a class="link-button" href="https://www.notion.so/utmmsa2023-24/Marketing-20793a1f50b38177a868e8bf46ba31ad" target="_blank">🗂 Marketing Notion</a>
-      <a class="link-button" href="https://www.utm.utoronto.ca/registrar/dates" target="_blank">📅 UTM Important Dates</a>
-      <a class="link-button" href="https://calendar.google.com/calendar/u/0?cid=MWQwNDI2ODYwNzkwZWE5ODk1ZGQ3OWZjZTk5MTg0MmFlOWFhNDkyODM1NDJiNzJmMzg2MzJjM2Y3OWZmYjI5ZkBncm91cC5jYWxlbmRhci5nb29nbGUuY29t" target="_blank">📆 Shared Calendar</a>
-    </div>
-  </div>
-
-  <!-- Countdown Section -->
-  <div class="collapsibles">
-    <button class="collapsible">⏳ Countdown</button>
-    <div class="content" id="countdowns"></div>
-  </div>
-  
-<!-- Marketing Request Form -->
-<div class="collapsibles">
-  <button class="collapsible">📨 Marketing Requests</button>
-  <div class="content">
-    <iframe 
-      src="https://docs.google.com/forms/d/e/1FAIpQLSewbjGTfT-ZQwQCwbFQEKDnK4oQ1QXreJip6wOtOmTQ5KzRfw/viewform?embedded=true" 
-      width="100%" 
-      height="800" 
-      frameborder="0" 
-      marginheight="0" 
-      marginwidth="0"
-      loading="lazy">
-      Loading…
-    </iframe>
-  </div>
-</div>
-
-  <!-- Marketing Events from API -->
-  <div class="collapsibles">
-    <button class="collapsible">📋 Marketing Events & Requests</button>
-    <div class="content" id="task-container"></div>
-  </div>
-
-  <!-- Interactive Calendar -->
-  <div class="collapsibles">
-    <button class="collapsible">📅 Interactive Deadline Calendar</button>
-    <div class="content">
-      <div class="calendar-legend">
-        <h4>📊 Status Legend:</h4>
-        <span class="legend-item status-inqueue">📥 In Queue</span>
-        <span class="legend-item status-inprogress">🔄 In Progress</span>
-        <span class="legend-item status-awaitingapproval">⏳ Awaiting Approval</span>
-        <span class="legend-item status-done">✅ Done</span>
+    
+    <div class="sidebar-footer">
+      <div class="ayah-sidebar">
+        <p class="highlight">وَقُلِ ٱعْمَلُوا۟ فَسَيَرَى ٱللَّهُ عَمَلَكُمْ</p>
+        <p class="citation">— At-Tawbah 9:105</p>
       </div>
-      <div id="calendar"></div>
     </div>
-  </div>
+  </nav>
 
-  <!-- Team Section -->
-  <div class="collapsibles">
-    <button class="collapsible">🤝 Team Roles</button>
-    <div class="content" id="team-roles"></div>
-  </div>
-<!-- Upload Section -->
-<div class="collapsibles">
-  <button class="collapsible">📤 Upload Drafts</button>
-  <div class="content" id="upload-section">
-    <iframe 
-      src="https://docs.google.com/forms/d/e/1FAIpQLSf_pkH3RDs4zvoiSd1f5SlVm9UCpfvTOEFgg4BrTS8KyWF7Uw/viewform?embedded=true" 
-      width="100%" 
-      height="800" 
-      frameborder="0" 
-      marginheight="0" 
-      marginwidth="0"
-      loading="lazy">
-      Loading…
-    </iframe>
-  </div>
-</div>
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Top Header -->
+    <header class="top-header">
+      <div class="header-left">
+        <button class="sidebar-toggle">☰</button>
+        <h1>UTMMSA 2025–2026 Marketing Command Center</h1>
+      </div>
+      <div class="header-right">
+        <div id="api-status" class="api-status">🔄 Connecting...</div>
+        <button id="toggle-mode" class="mode-toggle">🌙</button>
+        <div class="user-menu">
+          <span class="user-greeting">السلام عليكم</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Dashboard Section -->
+    <section id="dashboard" class="content-section active">
+      <div class="dashboard-grid">
+        <!-- Quick Stats -->
+        <div class="dashboard-card stats-overview">
+          <h3>📊 Overview</h3>
+          <div class="stats-grid" id="quick-stats">
+            <div class="stat-item">
+              <span class="stat-number" id="total-events">-</span>
+              <span class="stat-label">Total Events</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number" id="pending-events">-</span>
+              <span class="stat-label">Pending</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number" id="completed-events">-</span>
+              <span class="stat-label">Completed</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number" id="overdue-events">-</span>
+              <span class="stat-label">Overdue</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Events -->
+        <div class="dashboard-card recent-events">
+          <h3>🕒 Recent Activity</h3>
+          <div id="recent-events-list" class="recent-list">
+            <div class="loading">Loading recent events...</div>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="dashboard-card quick-actions">
+          <h3>⚡ Quick Actions</h3>
+          <div class="action-buttons">
+            <button class="action-btn" onclick="openSection('events')">
+              <span>📝</span>
+              View All Events
+            </button>
+            <button class="action-btn" onclick="openSection('calendar')">
+              <span>📅</span>
+              Open Calendar
+            </button>
+            <button class="action-btn" onclick="refreshData()">
+              <span>🔄</span>
+              Refresh Data
+            </button>
+          </div>
+        </div>
+
+        <!-- Mini Calendar -->
+        <div class="dashboard-card mini-calendar">
+          <h3>📅 This Month</h3>
+          <div id="mini-calendar"></div>
+        </div>
+
+        <!-- Quick Links -->
+        <div class="dashboard-card quick-links">
+          <h3>🔗 Quick Links</h3>
+          <div class="links-grid">
+            <a href="https://www.lensbridge.tech/" target="_blank" class="link-item">
+              <span>🔗</span>LensBridge
+            </a>
+            <a href="https://www.notion.so/utmmsa2023-24/25-26-20793a1f50b3802fa699ea4681c955b5" target="_blank" class="link-item">
+              <span>🧭</span>MSA Notion
+            </a>
+            <a href="https://www.notion.so/utmmsa2023-24/Marketing-20793a1f50b38177a868e8bf46ba31ad" target="_blank" class="link-item">
+              <span>🗂</span>Marketing
+            </a>
+            <a href="https://www.utm.utoronto.ca/registrar/dates" target="_blank" class="link-item">
+              <span>📅</span>UTM Dates
+            </a>
+            <a href="https://calendar.google.com/calendar/u/0?cid=MWQwNDI2ODYwNzkwZWE5ODk1ZGQ3OWZjZTk5MTg0MmFlOWFhNDkyODM1NDJiNzJmMzg2MzJjM2Y3OWZmYjI5ZkBncm91cC5jYWxlbmRhci5nb29nbGUuY29t" target="_blank" class="link-item">
+              <span>📆</span>Shared Cal
+            </a>
+          </div>
+        </div>
+
+        <!-- System Status -->
+        <div class="dashboard-card system-status">
+          <h3>🚦 System Status</h3>
+          <div class="status-items">
+            <div class="status-item">
+              <span class="status-indicator" id="api-indicator">🔴</span>
+              <span class="status-text">API Connection</span>
+            </div>
+            <div class="status-item">
+              <span class="status-indicator" id="discord-indicator">🟡</span>
+              <span class="status-text">Discord Bot</span>
+            </div>
+            <div class="status-item">
+              <span class="status-indicator" id="data-indicator">🟢</span>
+              <span class="status-text">Data Sync</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Events Section -->
+    <section id="events" class="content-section">
+      <div class="section-header">
+        <h2>📋 Marketing Events & Requests</h2>
+        <div class="section-actions">
+          <select id="status-filter" class="filter-select">
+            <option value="">All Status</option>
+            <option value="📥 In Queue">📥 In Queue</option>
+            <option value="🔄 In Progress">🔄 In Progress</option>
+            <option value="⏳ Awaiting Approval">⏳ Awaiting Approval</option>
+            <option value="⏳ Awaiting Posting">⏳ Awaiting Posting</option>
+            <option value="✅ Done">✅ Done</option>
+          </select>
+          <button class="action-btn" onclick="exportEvents()">📤 Export</button>
+        </div>
+      </div>
+      
+      <div class="events-summary" id="events-summary">
+        <!-- Summary will be populated by JS -->
+      </div>
+      
+      <div class="events-container" id="task-container">
+        <div class="loading">🔄 Loading events from API...</div>
+      </div>
+    </section>
+
+    <!-- Calendar Section -->
+    <section id="calendar" class="content-section">
+      <div class="section-header">
+        <h2>📅 Interactive Deadline Calendar</h2>
+        <div class="calendar-controls">
+          <div class="calendar-legend">
+            <span class="legend-item status-inqueue">📥 In Queue</span>
+            <span class="legend-item status-inprogress">🔄 In Progress</span>
+            <span class="legend-item status-awaitingapproval">⏳ Awaiting Approval</span>
+            <span class="legend-item status-awaitingposting">⏳ Awaiting Posting</span>
+            <span class="legend-item status-done">✅ Done</span>
+          </div>
+        </div>
+      </div>
+      <div class="calendar-container">
+  <div id="calendar-dup-warning" style="display:none" class="dup-warning">Duplicate events detected from API (filtered). Review API source.</div>
+  <div id="main-calendar"></div>
+      </div>
+    </section>
+
+    <!-- Analytics Section -->
+    <section id="analytics" class="content-section">
+      <div class="section-header">
+        <h2>📈 Analytics Dashboard</h2>
+        <div class="analytics-controls">
+          <select id="analytics-period">
+            <option value="7">Last 7 days</option>
+            <option value="30" selected>Last 30 days</option>
+            <option value="90">Last 90 days</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="analytics-grid">
+        <div class="analytics-card">
+          <h3>Status Distribution</h3>
+          <canvas id="statusChart"></canvas>
+        </div>
+        <div class="analytics-card">
+          <h3>Completion Timeline</h3>
+          <canvas id="timelineChart"></canvas>
+        </div>
+        <div class="analytics-card">
+          <h3>Request Types</h3>
+          <canvas id="typeChart"></canvas>
+        </div>
+        <div class="analytics-card">
+          <h3>Performance Metrics</h3>
+          <div class="metrics-list">
+            <div class="metric-item">
+              <span class="metric-label">Avg. Completion Time</span>
+              <span class="metric-value" id="avg-completion">-</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Success Rate</span>
+              <span class="metric-value" id="success-rate">-</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Peak Activity Day</span>
+              <span class="metric-value" id="peak-day">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Team Section -->
+    <section id="team" class="content-section">
+      <div class="section-header">
+        <h2>👥 Team Management</h2>
+      </div>
+      <div class="team-grid" id="team-roles">
+        <div class="loading">Loading team information...</div>
+      </div>
+    </section>
+
+    <!-- Tools Section -->
+    <section id="tools" class="content-section">
+      <div class="section-header">
+        <h2>🛠️ Tools</h2>
+      </div>
+      
+      <div class="tools-grid">
+        <div class="tool-card">
+          <h3>🧪 API Testing</h3>
+          <p>Test your API connection and endpoints</p>
+          <div class="api-test-section">
+            <button onclick="testApiConnection()" class="action-btn">Test API Health</button>
+            <button onclick="testApiEvents()" class="action-btn">Test Events Endpoint</button>
+            <div id="api-test-results" class="test-results"></div>
+          </div>
+        </div>
+        
+        <div class="tool-card">
+          <h3>📤 Export Data</h3>
+          <p>Export events and analytics data</p>
+          <div class="export-section">
+            <button onclick="exportEvents()" class="action-btn">Export Events CSV</button>
+            <button onclick="refreshData()" class="action-btn">Refresh All Data</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Error/Success Toast -->
+  <div id="toast" class="toast"></div>
+
+  <!-- API Error Display -->
+  <div id="api-error" class="api-error" style="display: none;"></div>
 
   <!-- Footer -->
-  <footer><p>JazakumAllahu khairan!</p></footer>
+  <footer class="main-footer">
+    <p>JazakumAllahu khairan! • Built with 💙 for UTMMSA Marketing Team</p>
+  </footer>
 
-  <!-- FullCalendar JS -->
+  <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
-
-  <!-- Configuration -->
   <script src="config.js"></script>
-  
-  <!-- Your JS -->
   <script src="script.js"></script>
-</body>
 </body>
 </html>
