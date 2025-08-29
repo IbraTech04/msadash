@@ -8,6 +8,9 @@
 
   <!-- FullCalendar CSS -->
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet">
+  
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Amiri:wght@400;700&family=Cinzel:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
   <!-- Bismillah -->
@@ -24,7 +27,11 @@
       </p>
       <p class="citation">— Surah At-Tawbah 9:105</p>
     </div>
-    <button id="toggle-mode">Toggle Night Mode</button>
+    <div class="header-controls">
+      <button id="toggle-mode">🌙 Toggle Night Mode</button>
+      <div id="api-status" class="api-status">🔄 Connecting to API...</div>
+    </div>
+    <div id="api-error" class="api-error" style="display: none;"></div>
   </header>
 
   <!-- Quick Links -->
@@ -62,16 +69,23 @@
   </div>
 </div>
 
-  <!-- Task Section -->
+  <!-- Marketing Events from API -->
   <div class="collapsibles">
-    <button class="collapsible">📋 Task Board</button>
+    <button class="collapsible">📋 Marketing Events & Requests</button>
     <div class="content" id="task-container"></div>
   </div>
 
-  <!-- Calendar Section -->
+  <!-- Interactive Calendar -->
   <div class="collapsibles">
-    <button class="collapsible">📆 Calendar View</button>
+    <button class="collapsible">📅 Interactive Deadline Calendar</button>
     <div class="content">
+      <div class="calendar-legend">
+        <h4>📊 Status Legend:</h4>
+        <span class="legend-item status-inqueue">📥 In Queue</span>
+        <span class="legend-item status-inprogress">🔄 In Progress</span>
+        <span class="legend-item status-awaitingapproval">⏳ Awaiting Approval</span>
+        <span class="legend-item status-done">✅ Done</span>
+      </div>
       <div id="calendar"></div>
     </div>
   </div>
@@ -104,8 +118,11 @@
   <!-- FullCalendar JS -->
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
 
+  <!-- Configuration -->
+  <script src="config.js"></script>
+  
   <!-- Your JS -->
-<script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
 </body>
 </html>
