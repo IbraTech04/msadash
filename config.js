@@ -2,8 +2,46 @@
 window.MSA_CONFIG = {
   // API Configuration
   api: {
-    baseUrl: 'http://localhost:5000', // Change this to your API server URL
-    apiKey: 'your-secret-api-key',    // Replace with your actual API key
+    // Environment-aware API URL configuration
+    baseUrl: (() => {
+      // Check for environment variables (if available through build process)
+      if (typeof process !== 'undefined' && process.env && process.env.MSA_API_URL) {
+        return process.env.MSA_API_URL;
+      }
+      
+      // Check for runtime environment variables (if injected by server)
+      if (window.MSA_ENV && window.MSA_ENV.API_URL) {
+        return window.MSA_ENV.API_URL;
+      }
+      
+      // Check URL parameters for quick environment switching
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('api_url')) {
+        return urlParams.get('api_url');
+      }
+      
+      // Environment detection based on hostname
+      const hostname = window.location.hostname;
+      if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return 'http://localhost:5000'; // Development
+      } else if (hostname.includes('staging') || hostname.includes('dev')) {
+        return 'https://api-staging.utmmsa.com'; // Staging
+      } else {
+        return 'https://api.utmmsa.com'; // Production
+      }
+    })(),
+    
+    apiKey: (() => {
+      // Environment-aware API key
+      if (typeof process !== 'undefined' && process.env && process.env.MSA_API_KEY) {
+        return process.env.MSA_API_KEY;
+      }
+      if (window.MSA_ENV && window.MSA_ENV.API_KEY) {
+        return window.MSA_ENV.API_KEY;
+      }
+      return 'your-secret-api-key'; // Fallback
+    })(),
+    
     timeout: 10000, // 10 second timeout
     retryAttempts: 3
   },

@@ -3,7 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MSA Marketing Command Center</title>
+  <title>UTM MSA Marketing Command Center</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="32x32" href="msa_logo.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="msa_logo.png">
+  <link rel="apple-touch-icon" href="msa_logo.png">
+  <link rel="shortcut icon" href="msa_logo.png">
+  
   <link rel="stylesheet" href="style.css" />
 
   <!-- FullCalendar CSS -->
@@ -20,7 +27,7 @@
   <nav class="sidebar">
     <div class="sidebar-header">
       <img id="logo" src="msa_logo.png" alt="MSA Logo" />
-      <h2>MSA Marketing</h2>
+      <h2>UTM MSA Marketing</h2>
       <div class="bismillah-sidebar">بِسْمِ ٱللَّٰهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div>
     </div>
     
@@ -54,9 +61,12 @@
     <div class="sidebar-footer">
       <div class="ayah-sidebar">
         <p class="highlight">وَقُلِ ٱعْمَلُوا۟ فَسَيَرَى ٱللَّهُ عَمَلَكُمْ</p>
-        <p class="citation">— At-Tawbah 9:105</p>
+        <a href="https://quran.com/at-tawbah/105" target="_blank"><p class="citation">— At-Tawbah 9:105</p></a>
       </div>
+    <caption class="highlight">v2025.8.1</caption>
     </div>
+
+
   </nav>
 
   <!-- Main Content -->
@@ -65,7 +75,10 @@
     <header class="top-header">
       <div class="header-left">
         <button class="sidebar-toggle">☰</button>
-        <h1>UTMMSA 2025–2026 Marketing Command Center</h1>
+        <h1>
+          <span class="title-full">Marketing Command Centre</span>
+          <span class="title-mobile">MSA</span>
+        </h1>
       </div>
       <div class="header-right">
         <div id="api-status" class="api-status">🔄 Connecting...</div>
@@ -317,11 +330,12 @@
 
   <!-- Footer -->
   <footer class="main-footer">
-    <p>JazakumAllahu khairan! • Built with 💙 for UTMMSA Marketing Team</p>
+    <p>JazakumAllahu khairan! • Built with 💙 for UTM MSA Marketing Team</p>
   </footer>
 
   <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+  <script src="env.js"></script>
   <script src="config.js"></script>
   <script src="script.js"></script>
 </body>

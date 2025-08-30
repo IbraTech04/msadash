@@ -222,6 +222,14 @@ body.night-mode .ayah-sidebar .citation {
   color: var(--primary-blue);
 }
 
+.title-mobile {
+  display: none;
+}
+
+.title-full {
+  display: inline;
+}
+
 .header-right {
   display: flex;
   align-items: center;
@@ -528,6 +536,78 @@ body.night-mode .ayah-sidebar .citation {
   box-shadow: var(--shadow-sm);
 }
 
+/* ========== STATUS SECTIONS ========== */
+.status-section {
+  margin-bottom: 2rem;
+  border: 1px solid var(--medium-gray);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.status-header {
+  background: var(--light-gray);
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  border-bottom: 1px solid var(--medium-gray);
+  transition: all 0.3s ease;
+}
+
+.status-header:hover {
+  background: var(--medium-gray);
+}
+
+.status-header h3 {
+  margin: 0;
+  color: var(--primary-blue);
+  font-family: 'Cinzel', serif;
+  font-size: 1.2rem;
+}
+
+.collapse-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: var(--border-radius-sm);
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+}
+
+.collapse-btn:hover {
+  background: var(--white);
+}
+
+.collapse-icon {
+  font-size: 1rem;
+  transition: transform 0.3s ease;
+  color: var(--primary-blue);
+}
+
+.status-section.collapsed .collapse-icon {
+  transform: rotate(-90deg);
+}
+
+.status-content {
+  padding: 1rem;
+  background: var(--white);
+  transition: all 0.3s ease;
+}
+
+.status-section.collapsed {
+  border-color: var(--dark-gray);
+}
+
+.status-section.collapsed .status-header {
+  border-bottom: none;
+}
+
 .event-card {
   border: 1px solid var(--medium-gray);
   border-radius: var(--border-radius-sm);
@@ -770,9 +850,49 @@ body.night-mode .ayah-sidebar .citation {
 
 /* ========== TEAM SECTION ========== */
 .team-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1.5rem;
+  display: block;
+  width: 100%;
+}
+
+.team-horizontal-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: stretch;
+  align-items: flex-start;
+  width: 100%;
+  padding: 1rem;
+  background: var(--light-gray);
+  border-radius: var(--border-radius);
+  margin-bottom: 1rem;
+}
+
+.role-section {
+  margin-bottom: 2rem;
+  width: 100%;
+  background: var(--white);
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--medium-gray);
+}
+
+.role-title {
+  color: var(--primary-blue);
+  font-family: 'Cinzel', serif;
+  font-size: 1.4rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 3px solid var(--accent-gold);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.role-title:before {
+  content: '👥';
+  font-size: 1.2rem;
 }
 
 .team-card {
@@ -780,31 +900,60 @@ body.night-mode .ayah-sidebar .citation {
   border-radius: var(--border-radius);
   padding: 1.5rem;
   box-shadow: var(--shadow-sm);
+  transition: all 0.3s ease;
+  border: 1px solid var(--medium-gray);
   text-align: center;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.team-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
 
 .team-avatar {
-  width: 80px;
-  height: 80px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--primary-blue), var(--secondary-blue));
-  margin: 0 auto 1rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
+  font-size: 1.5rem;
   color: var(--white);
+  margin: 0 auto 1rem;
+  flex-shrink: 0;
+}
+
+.team-info {
+  text-align: center;
+  width: 100%;
 }
 
 .team-name {
   font-weight: 600;
   color: var(--primary-blue);
   margin-bottom: 0.5rem;
+  font-size: 1rem;
+  line-height: 1.2;
 }
 
 .team-role {
   color: var(--dark-gray);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.team-year {
+  color: var(--secondary-blue);
+  font-size: 0.8rem;
+  font-weight: 500;
 }
 
 /* ========== TOOLS SECTION ========== */
@@ -1043,17 +1192,67 @@ body.night-mode .ayah-sidebar .citation {
 .night-mode .events-container,
 .night-mode .calendar-container,
 .night-mode .analytics-card,
-.night-mode .tool-card {
+.night-mode .tool-card,
+.night-mode .team-card,
+.night-mode .role-section,
+.night-mode .status-section,
+.night-mode .status-content {
   background-color: #2d2d2d;
   border-color: #404040;
   color: #e9ecef;
 }
 
+.night-mode .status-header {
+  background-color: #404040;
+  border-color: #555;
+}
+
+.night-mode .status-header:hover {
+  background-color: #555;
+}
+
+.night-mode .status-header h3 {
+  color: var(--accent-gold);
+}
+
+.night-mode .collapse-btn:hover {
+  background-color: #555;
+}
+
+.night-mode .collapse-icon {
+  color: var(--accent-gold);
+}
+
+.night-mode .team-horizontal-grid {
+  background-color: #404040;
+}
+
 .night-mode .dashboard-card h3,
 .night-mode .section-header h2,
 .night-mode .analytics-card h3,
-.night-mode .tool-card h3 {
+.night-mode .tool-card h3,
+.night-mode .role-title {
   color: var(--accent-gold);
+}
+
+.night-mode .team-name {
+  color: var(--accent-gold);
+}
+
+.night-mode .team-role,
+.night-mode .team-year {
+  color: #b0b3b8;
+}
+
+.night-mode .team-email a {
+  color: #e9ecef;
+  border-color: #555;
+}
+
+.night-mode .team-email a:hover {
+  background-color: var(--accent-gold);
+  color: #1a1a1a;
+  border-color: var(--accent-gold);
 }
 
 .night-mode .stat-item,
@@ -1127,23 +1326,107 @@ body.night-mode .ayah-sidebar .citation {
     align-items: flex-start;
   }
   
+  .team-horizontal-grid {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  
+  .team-card {
+    padding: 1rem;
+  }
+  
+  .team-avatar {
+    width: 50px;
+    height: 50px;
+    font-size: 1.25rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .team-name {
+    font-size: 0.9rem;
+  }
+  
+  .team-role {
+    font-size: 0.8rem;
+  }
+  
+  .team-year {
+    font-size: 0.75rem;
+  }
+  
+  .role-section {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+  }
+  
   .modal {
     margin: 0.5rem;
     padding: 1rem;
   }
 }
 
-@media (max-width: 480px) {
-  .top-header {
-    padding: 0 1rem;
+@media (max-width: 768px) {
+  .sidebar-toggle {
+    display: block;
+  }
+  
+  .header-left h1 {
+    font-size: 1.3rem;
   }
   
   .header-right {
+    gap: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .top-header {
+    padding: 0 0.5rem;
+    height: 56px;
+  }
+  
+  .header-left {
     gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+  
+  .header-left h1 {
+    font-size: 1rem;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    margin: 0;
+    max-width: 100%;
+  }
+  
+  .title-full {
+    display: none !important;
+  }
+  
+  .title-mobile {
+    display: inline !important;
+  }
+  
+  .sidebar-toggle {
+    display: block;
+    font-size: 1.2rem;
+    padding: 0.25rem;
+  }
+  
+  .header-right {
+    gap: 0.25rem;
+    flex-shrink: 0;
   }
   
   .user-greeting {
     display: none;
+  }
+  
+  .mode-toggle {
+    padding: 0.4rem;
+    font-size: 0.9rem;
   }
   
   .stats-grid {
@@ -1172,6 +1455,31 @@ body.night-mode .ayah-sidebar .citation {
   .legend-item {
     font-size: 0.7rem;
     padding: 0.4rem 0.8rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .top-header {
+    padding: 0 0.25rem;
+    height: 52px;
+  }
+  
+  .header-left {
+    gap: 0.25rem;
+  }
+  
+  .header-left h1 {
+    font-size: 0.9rem;
+  }
+  
+  .sidebar-toggle {
+    font-size: 1rem;
+    padding: 0.2rem;
+  }
+  
+  .mode-toggle {
+    padding: 0.3rem;
+    font-size: 0.8rem;
   }
 }
 
