@@ -4,8 +4,9 @@
 
 window.MSA_ENV = {
   // API Configuration from environment variables
-  API_URL: undefined, // Will be set by build process: process.env.MSA_API_URL
-  API_KEY: undefined, // Will be set by build process: process.env.MSA_API_KEY
+  // Set these values to override the default API configuration
+  API_URL: undefined, // e.g., "https://api.utmmsa.com"
+  API_KEY: undefined, // e.g., "your-production-key"
   
   // Environment info
   ENVIRONMENT: undefined, // 'development', 'staging', 'production'
@@ -17,12 +18,14 @@ window.MSA_ENV = {
   ENABLE_ANALYTICS: false
 };
 
-// Example build script replacement:
-// This file can be processed by your build system to replace values like:
-// API_URL: "%%MSA_API_URL%%"  -> API_URL: "https://api.utmmsa.com"
-// API_KEY: "%%MSA_API_KEY%%"  -> API_KEY: "prod-key-12345"
+// Example: To set a custom API URL, uncomment and modify this line:
+window.MSA_ENV.API_URL = "https://50c0ac0143b3.ngrok-free.app";
 
-// Development helper - remove in production
+// Example: To set a custom API key, uncomment and modify this line:
+// window.MSA_ENV.API_KEY = "your-secret-key";
+
+// Development helper - logs configuration in development
 if (window.location.hostname === 'localhost') {
   console.log('🔧 MSA Environment Config Loaded', window.MSA_ENV);
+  console.log('📡 Current API URL will be determined by config.js');
 }

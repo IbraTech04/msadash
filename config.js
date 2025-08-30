@@ -4,12 +4,7 @@ window.MSA_CONFIG = {
   api: {
     // Environment-aware API URL configuration
     baseUrl: (() => {
-      // Check for environment variables (if available through build process)
-      if (typeof process !== 'undefined' && process.env && process.env.MSA_API_URL) {
-        return process.env.MSA_API_URL;
-      }
-      
-      // Check for runtime environment variables (if injected by server)
+      // Check for runtime environment variables (set in env.js)
       if (window.MSA_ENV && window.MSA_ENV.API_URL) {
         return window.MSA_ENV.API_URL;
       }
@@ -32,10 +27,7 @@ window.MSA_CONFIG = {
     })(),
     
     apiKey: (() => {
-      // Environment-aware API key
-      if (typeof process !== 'undefined' && process.env && process.env.MSA_API_KEY) {
-        return process.env.MSA_API_KEY;
-      }
+      // Environment-aware API key (set in env.js)
       if (window.MSA_ENV && window.MSA_ENV.API_KEY) {
         return window.MSA_ENV.API_KEY;
       }
