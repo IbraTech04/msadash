@@ -191,7 +191,8 @@ async function makeApiRequest(endpoint, options = {}) {
   const defaultOptions = {
     headers: {
       'X-API-Key': API_CONFIG.apiKey,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'ngrok-skip-browser-warning': 'true'
     }
   };
   
