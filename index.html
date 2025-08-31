@@ -40,6 +40,10 @@
         <span class="nav-icon">📋</span>
         <span class="nav-text">Events & Requests</span>
       </a>
+      <a href="#kanban" class="nav-item" data-section="kanban">
+        <span class="nav-icon">🗂️</span>
+        <span class="nav-text">Kanban Board</span>
+      </a>
       <a href="#calendar" class="nav-item" data-section="calendar">
         <span class="nav-icon">📅</span>
         <span class="nav-text">Calendar</span>
@@ -214,6 +218,27 @@
       
       <div class="events-container" id="task-container">
         <div class="loading">🔄 Loading events from API...</div>
+      </div>
+    </section>
+
+    <!-- Kanban Board Section -->
+    <section id="kanban" class="content-section">
+      <div class="section-header">
+        <h2>🗂️ Kanban Board</h2>
+        <div class="section-actions">
+          <select id="kanban-filter" class="filter-select">
+            <option value="">All Departments</option>
+            <option value="events">Events</option>
+            <option value="marketing">Marketing</option>
+            <option value="social-media">Social Media</option>
+            <option value="design">Design</option>
+          </select>
+          <button class="action-btn" onclick="refreshKanban()">🔄 Refresh</button>
+        </div>
+      </div>
+      
+      <div class="kanban-container" id="kanban-container">
+        <div class="loading">🔄 Loading Kanban board...</div>
       </div>
     </section>
 

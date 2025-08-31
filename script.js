@@ -143,6 +143,9 @@ function openSection(sectionId) {
     case 'calendar':
       loadMainCalendar();
       break;
+    case 'kanban':
+      loadKanbanBoard();
+      break;
     case 'analytics':
       loadAnalytics();
       break;
@@ -702,6 +705,116 @@ function hideCalendarTooltip() {
     activeCalTooltip = null;
   }
 }
+
+// ========== KANBAN BOARD FUNCTIONS ==========
+async function loadKanbanBoard() {
+  try {
+    if (!currentEvents || currentEvents.length === 0) {
+      document.getElementById('kanban-container').innerHTML = '<div class="loading">🔄 Loading data...</div>';
+      return;
+    }
+    
+    displayKanbanBoard(currentEvents);
+  } catch (error) {
+    console.error('❌ Error loading Kanban board:', error);
+    document.getElementById('kanban-container').innerHTML = '<div class="loading error">❌ Error loading Kanban board</div>';
+  }
+}
+
+function displayKanbanBoard(events) {
+  const container = document.getElementById('kanban-container');
+  if (!container) return;
+  
+  // Define the columns/statuses
+  const statuses = [
+    '📥 In Queue',
+    '🔄 In Progress', 
+    '⏳ Awaiting Approval',
+    '⏳ Awaiting Posting',
+    '✅ Done'
+  ];
+  
+  // Filter events by department if filter is set
+  const departmentFilter = document.getElementById('kanban-filter')?.value;
+  const filteredEvents = departmentFilter ? 
+    events.filter(event => event.department_key === departmentFilter) : 
+    events;
+  
+  // Group events by status
+  const eventsByStatus = statuses.reduce((acc, status) => {
+    acc[status] = filteredEvents.filter(event => event.status === status);
+    return acc;
+  }, {});
+  
+  // Create the Kanban columns
+  container.innerHTML = statuses.map(status => {
+    const statusEvents = eventsByStatus[status] || [];
+    const cards = statusEvents.map(event => createKanbanCard(event)).join('');
+    
+    return `
+      <div class="kanban-column" data-status="${status}">
+        <div class="kanban-header">
+          <div class="kanban-title">
+            ${status}
+          </div>
+          <div class="kanban-count">${statusEvents.length}</div>
+        </div>
+        <div class="kanban-cards">
+          ${cards || '<div class="kanban-empty">No items</div>'}
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  // Add click handlers to cards
+  container.querySelectorAll('.kanban-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const eventData = JSON.parse(card.dataset.event);
+      showEventModal(eventData);
+    });
+  });
+}
+
+function createKanbanCard(event) {
+  const dueDate = new Date(event.posting_date);
+  const daysUntilDue = Math.ceil((dueDate - new Date()) / (1000 * 60 * 60 * 24));
+  const isOverdue = daysUntilDue < 0;
+  const isUrgent = daysUntilDue <= 2 && daysUntilDue >= 0;
+  
+  const dueDateClass = isOverdue ? 'overdue' : isUrgent ? 'urgent' : '';
+  const dueDateText = isOverdue ? 
+    `${Math.abs(daysUntilDue)} days overdue` : 
+    isUrgent ? 
+      `${daysUntilDue} days left` : 
+      `Due ${dueDate.toLocaleDateString()}`;
+  
+  return `
+    <div class="kanban-card" data-event='${JSON.stringify(event)}'>
+      <div class="kanban-card-type">${formatRequestType(event.request_type)}</div>
+      <div class="kanban-card-title">${event.title}</div>
+      <div class="kanban-card-department">${event.department_name || 'N/A'}</div>
+      <div class="kanban-card-meta">
+        <div class="kanban-card-due ${dueDateClass}">${dueDateText}</div>
+        ${event.assigned_to_name ? `<div>👤 ${event.assigned_to_name}</div>` : '<div>👤 Unassigned</div>'}
+        ${event.location ? `<div>📍 ${event.location}</div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function refreshKanban() {
+  loadKanbanBoard();
+}
+
+// Setup Kanban filter
+document.addEventListener('DOMContentLoaded', () => {
+  const kanbanFilter = document.getElementById('kanban-filter');
+  if (kanbanFilter) {
+    kanbanFilter.addEventListener('change', () => {
+      displayKanbanBoard(currentEvents);
+    });
+  }
+});
 
 // ========== MODAL FUNCTIONS ==========
 function showEventModal(event) {
