@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UTM MSA Marketing Command Center</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="32x32" href="msa_logo.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="msa_logo.png">
+  <link rel="apple-touch-icon" href="msa_logo.png">
+  <link rel="shortcut icon" href="msa_logo.png">
+  
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- FullCalendar CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet">
+  
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Amiri:wght@400;700&family=Cinzel:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js for analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <!-- Navigation Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-header">
+      <img id="logo" src="msa_logo.png" alt="MSA Logo" />
+      <h2>UTM MSA Marketing</h2>
+      <div class="bismillah-sidebar">بِسْمِ ٱللَّٰهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div>
+    </div>
+    
+    <div class="nav-menu">
+      <a href="#dashboard" class="nav-item active" data-section="dashboard">
+        <span class="nav-icon">📊</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+      <a href="#events" class="nav-item" data-section="events">
+        <span class="nav-icon">📋</span>
+        <span class="nav-text">Events & Requests</span>
+      </a>
+      <a href="#kanban" class="nav-item" data-section="kanban">
+        <span class="nav-icon">🗂️</span>
+        <span class="nav-text">Kanban Board</span>
+      </a>
+      <a href="#calendar" class="nav-item" data-section="calendar">
+        <span class="nav-icon">📅</span>
+        <span class="nav-text">Calendar</span>
+      </a>
+      <a href="#analytics" class="nav-item" data-section="analytics">
+        <span class="nav-icon">📈</span>
+        <span class="nav-text">Analytics</span>
+      </a>
+      <a href="#tools" class="nav-item" data-section="tools">
+        <span class="nav-icon">🛠️</span>
+        <span class="nav-text">Tools</span>
+      </a>
+    </div>
+    
+    <div class="sidebar-footer">
+      <div class="ayah-sidebar">
+        <p class="highlight">وَقُلِ ٱعْمَلُوا۟ فَسَيَرَى ٱللَّهُ عَمَلَكُمْ</p>
+        <a href="https://quran.com/at-tawbah/105" target="_blank"><p class="citation">— At-Tawbah 9:105</p></a>
+      </div>
+    <caption class="highlight">v2025.8.1</caption>
+    </div>
+
+
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Top Header -->
+    <header class="top-header">
+      <div class="header-left">
+        <button class="sidebar-toggle">☰</button>
+        <h1>
+          <span class="title-full">Marketing Command Centre</span>
+          <span class="title-mobile">MSA</span>
+        </h1>
+      </div>
+      <div class="header-right">
+        <div id="api-status" class="api-status">🔄 Connecting...</div>
+        <button id="toggle-mode" class="mode-toggle">🌙</button>
+        <div class="user-menu">
+          <span class="user-greeting">السلام عليكم</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Dashboard Section -->
+    <section id="dashboard" class="content-section active">
+      <div class="dashboard-grid">
+        <!-- Quick Stats -->
+        <div class="dashboard-card stats-overview">
+          <h3>📊 Overview</h3>
+          <div class="stats-grid" id="quick-stats">
+            <div class="stat-item">
+              <span class="stat-number" id="total-events">-</span>
+              <span class="stat-label">Total Events</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number" id="pending-events">-</span>
+              <span class="stat-label">Pending</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number" id="completed-events">-</span>
+              <span class="stat-label">Completed</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-number" id="overdue-events">-</span>
+              <span class="stat-label">Overdue</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Events -->
+        <div class="dashboard-card recent-events">
+          <h3>🕒 Recent Activity</h3>
+          <div id="recent-events-list" class="recent-list">
+            <div class="loading">Loading recent events...</div>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="dashboard-card quick-actions">
+          <h3>⚡ Quick Actions</h3>
+          <div class="action-buttons">
+            <button class="action-btn" onclick="openSection('events')">
+              <span>📝</span>
+              View All Events
+            </button>
+            <button class="action-btn" onclick="openSection('calendar')">
+              <span>📅</span>
+              Open Calendar
+            </button>
+            <button class="action-btn" onclick="refreshData()">
+              <span>🔄</span>
+              Refresh Data
+            </button>
+          </div>
+        </div>
+
+        <!-- Mini Calendar -->
+        <div class="dashboard-card mini-calendar">
+          <h3>📅 This Month</h3>
+          <div id="mini-calendar"></div>
+        </div>
+
+        <!-- Quick Links -->
+        <div class="dashboard-card quick-links">
+          <h3>🔗 Quick Links</h3>
+          <div class="links-grid">
+            <a href="https://www.lensbridge.tech/" target="_blank" class="link-item">
+              <span>🔗</span>LensBridge
+            </a>
+            <a href="https://www.notion.so/utmmsa2023-24/25-26-20793a1f50b3802fa699ea4681c955b5" target="_blank" class="link-item">
+              <span>🧭</span>MSA Notion
+            </a>
+            <a href="https://www.notion.so/utmmsa2023-24/Marketing-20793a1f50b38177a868e8bf46ba31ad" target="_blank" class="link-item">
+              <span>🗂</span>Marketing
+            </a>
+            <a href="https://www.utm.utoronto.ca/registrar/dates" target="_blank" class="link-item">
+              <span>📅</span>UTM Dates
+            </a>
+            <a href="https://calendar.google.com/calendar/u/0?cid=MWQwNDI2ODYwNzkwZWE5ODk1ZGQ3OWZjZTk5MTg0MmFlOWFhNDkyODM1NDJiNzJmMzg2MzJjM2Y3OWZmYjI5ZkBncm91cC5jYWxlbmRhci5nb29nbGUuY29t" target="_blank" class="link-item">
+              <span>📆</span>Shared Cal
+            </a>
+          </div>
+        </div>
+
+        <!-- System Status -->
+        <div class="dashboard-card system-status">
+          <h3>🚦 System Status</h3>
+          <div class="status-items">
+            <div class="status-item">
+              <span class="status-indicator" id="api-indicator">🔴</span>
+              <span class="status-text">API Connection</span>
+            </div>
+            <div class="status-item">
+              <span class="status-indicator" id="discord-indicator">🟡</span>
+              <span class="status-text">Discord Bot</span>
+            </div>
+            <div class="status-item">
+              <span class="status-indicator" id="data-indicator">🟢</span>
+              <span class="status-text">Data Sync</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Events Section -->
+    <section id="events" class="content-section">
+      <div class="section-header">
+        <h2>📋 Marketing Events & Requests</h2>
+        <div class="section-actions">
+          <select id="status-filter" class="filter-select">
+            <option value="">All Status</option>
+            <option value="📥 In Queue">📥 In Queue</option>
+            <option value="🔄 In Progress">🔄 In Progress</option>
+            <option value="⏳ Awaiting Approval">⏳ Awaiting Approval</option>
+            <option value="⏳ Awaiting Posting">⏳ Awaiting Posting</option>
+            <option value="✅ Done">✅ Done</option>
+          </select>
+          <button class="action-btn" onclick="exportEvents()">📤 Export</button>
+        </div>
+      </div>
+      
+      <div class="events-summary" id="events-summary">
+        <!-- Summary will be populated by JS -->
+      </div>
+      
+      <div class="events-container" id="task-container">
+        <div class="loading">🔄 Loading events from API...</div>
+      </div>
+    </section>
+
+    <!-- Kanban Board Section -->
+    <section id="kanban" class="content-section">
+      <div class="section-header">
+        <h2>🗂️ Kanban Board</h2>
+        <div class="section-actions">
+          <select id="kanban-filter" class="filter-select">
+            <option value="">All Departments</option>
+            <option value="events">Events</option>
+            <option value="marketing">Marketing</option>
+            <option value="social-media">Social Media</option>
+            <option value="design">Design</option>
+          </select>
+          <button class="action-btn" onclick="refreshKanban()">🔄 Refresh</button>
+        </div>
+      </div>
+      
+      <div class="kanban-container" id="kanban-container">
+        <div class="loading">🔄 Loading Kanban board...</div>
+      </div>
+    </section>
+
+    <!-- Calendar Section -->
+    <section id="calendar" class="content-section">
+      <div class="section-header">
+        <h2>📅 Interactive Deadline Calendar</h2>
+        <div class="calendar-controls">
+          <div class="calendar-legend">
+            <span class="legend-item status-inqueue">📥 In Queue</span>
+            <span class="legend-item status-inprogress">🔄 In Progress</span>
+            <span class="legend-item status-awaitingapproval">⏳ Awaiting Approval</span>
+            <span class="legend-item status-awaitingposting">⏳ Awaiting Posting</span>
+            <span class="legend-item status-done">✅ Done</span>
+          </div>
+        </div>
+      </div>
+      <div class="calendar-container">
+        <div id="main-calendar"></div>
+      </div>
+    </section>
+
+    <!-- Analytics Section -->
+    <section id="analytics" class="content-section">
+      <div class="section-header">
+        <h2>📈 Analytics Dashboard</h2>
+        <div class="analytics-controls">
+          <select id="analytics-period">
+            <option value="7">Last 7 days</option>
+            <option value="30" selected>Last 30 days</option>
+            <option value="90">Last 90 days</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="analytics-grid">
+        <div class="analytics-card">
+          <h3>Status Distribution</h3>
+          <canvas id="statusChart"></canvas>
+        </div>
+        <div class="analytics-card">
+          <h3>Completion Timeline</h3>
+          <canvas id="timelineChart"></canvas>
+        </div>
+        <div class="analytics-card">
+          <h3>Request Types</h3>
+          <canvas id="typeChart"></canvas>
+        </div>
+        <div class="analytics-card">
+          <h3>Performance Metrics</h3>
+          <div class="metrics-list">
+            <div class="metric-item">
+              <span class="metric-label">Avg. Completion Time</span>
+              <span class="metric-value" id="avg-completion">-</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Success Rate</span>
+              <span class="metric-value" id="success-rate">-</span>
+            </div>
+            <div class="metric-item">
+              <span class="metric-label">Peak Activity Day</span>
+              <span class="metric-value" id="peak-day">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Team Section removed -->
+
+    <!-- Tools Section -->
+    <section id="tools" class="content-section">
+      <div class="section-header">
+        <h2>🛠️ Tools</h2>
+      </div>
+      
+      <div class="tools-grid">
+        <div class="tool-card">
+          <h3>🧪 API Testing</h3>
+          <p>Test your API connection and endpoints</p>
+          <div class="api-test-section">
+            <button onclick="testApiConnection()" class="action-btn">Test API Health</button>
+            <button onclick="testApiEvents()" class="action-btn">Test Events Endpoint</button>
+            <div id="api-test-results" class="test-results"></div>
+          </div>
+        </div>
+        
+        <div class="tool-card">
+          <h3>📤 Export Data</h3>
+          <p>Export events and analytics data</p>
+          <div class="export-section">
+            <button onclick="exportEvents()" class="action-btn">Export Events CSV</button>
+            <button onclick="refreshData()" class="action-btn">Refresh All Data</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Error/Success Toast -->
+  <div id="toast" class="toast"></div>
+
+  <!-- API Error Display -->
+  <div id="api-error" class="api-error" style="display: none;"></div>
+
+  <!-- Footer -->
+  <footer class="main-footer">
+    <p>JazakumAllahu khairan! • Built with 💙 for UTM MSA Marketing Team</p>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+  <script src="env.js"></script>
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
