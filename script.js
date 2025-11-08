@@ -1,106 +1,195 @@
 // ========== MSA MARKETING COMMAND CENTER - DASHBOARD SCRIPT ==========
-
-// Configuration (loaded from config.js)
-const API_CONFIG = window.MSA_CONFIG?.api || {
-  baseUrl: 'http://localhost:5000',
-  apiKey: 'your-secret-api-key',
-  timeout: 10000,
-  retryAttempts: 3
-};
-
-const FEATURES = window.MSA_CONFIG?.features || {
-  useApi: true,
-  showApiStatus: true,
-  enableNotifications: false,
-  enableOfflineMode: false
-};
+// Refactored for Spring Boot Backend API
 
 // Global state
 let currentEvents = [];
 let currentCalendar = null;
 let charts = {};
 let calendarLoading = false;
-let eventsLoadingPromise = null; // prevent duplicate fetches
+let eventsLoadingPromise = null;
+let api = null; // Will be initialized when API service is ready
 
-// Generate a stable hash for events lacking an explicit id (prevents duplicates across reloads)
-function generateStableEventId(event) {
-  const base = [
-    event.title || '',
-    event.posting_date || '',
-    event.request_type || '',
-    event.department || '',
-    event.assigned_to_name || '',
-    event.requester_name || ''
-  ].join('|');
-  let hash = 0;
-  for (let i = 0; i < base.length; i++) {
-    hash = ((hash << 5) - hash) + base.charCodeAt(i);
-    hash |= 0; // Convert to 32bit int
-  }
-  return `h${Math.abs(hash)}`;
-}
-
-// Format request type with icon and styling
-function formatRequestType(requestType) {
-  if (!requestType) return 'General';
+// Wait for DOM and API service to load
+document.addEventListener("DOMContentLoaded", async () => {
+  console.log('🚀 Initializing MSA Marketing Dashboard...');
   
-  const type = requestType.toLowerCase();
-  let icon = '';
-  let displayText = requestType;
-  
-  // Add icons for specific request types
-  if (type.includes('reel')) {
-    icon = '📹 ';
-    displayText = requestType.toUpperCase();
-  } else if (type.includes('post')) {
-    icon = '📱 ';
-    displayText = requestType.toUpperCase();
-  } else if (type.includes('story')) {
-    icon = '📸 ';
-  } else if (type.includes('video')) {
-    icon = '🎥 ';
-  } else if (type.includes('graphic') || type.includes('design')) {
-    icon = '🎨 ';
-  } else if (type.includes('flyer') || type.includes('poster')) {
-    icon = '📄 ';
-  } else if (type.includes('event')) {
-    icon = '📅 ';
-  } else if (type.includes('photography') || type.includes('photo')) {
-    icon = '📷 ';
+  // Wait for API service to be ready
+  if (window.apiService) {
+    api = window.apiService;
+  } else {
+    console.error('❌ API Service not loaded!');
+    showToast('Failed to load API service', 'error');
+    return;
   }
   
-  return `${icon}${displayText}`;
-}
-
-// Wait for DOM to fully load
-document.addEventListener("DOMContentLoaded", () => {
   initializeDashboard();
   setupNavigation();
   setupModeToggle();
   applyInitialTheme();
-  checkApiHealth();
-  loadAllData();
+  
+  // Check if we're returning from a failed auth attempt
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('error') === 'auth_failed') {
+    showToast('Authentication failed. Please ensure you are a member of the UTM MSA Discord server.', 'error');
+    // Clean up URL
+    window.history.replaceState({}, document.title, '/');
+  }
+  
+  // Check authentication first
+  const isAuthenticated = await checkAuthentication();
+  
+  if (!isAuthenticated) {
+    // Show login screen instead of loading data
+    showLoginScreen();
+    return;
+  }
+  
+  // Show success message if we just logged in
+  if (urlParams.get('logged_in') === 'true') {
+    showToast('Welcome back! Loading your dashboard...', 'success');
+    window.history.replaceState({}, document.title, '/');
+  }
+  
+  // Load data only if authenticated
+  await loadAllData();
   setupAutoRefresh();
+  
+  console.log('✅ Dashboard initialized');
 });
 
-// Handle viewport changes for mobile responsive API status
-window.addEventListener('resize', () => {
-  // Re-trigger API status update on resize to adjust mobile/desktop display
-  const statusEl = document.getElementById('api-status');
-  if (statusEl) {
-    const currentClass = statusEl.className;
-    const type = currentClass.includes('success') ? 'success' : 
-                 currentClass.includes('error') ? 'error' : 'loading';
-    const message = statusEl.textContent.includes('✅') || statusEl.textContent === 'Connected' ? '✅ Connected' :
-                   statusEl.textContent.includes('❌') || statusEl.textContent === 'Disconnected' ? '❌ Disconnected' : '🔄 Connecting...';
-    updateApiStatus(message, type);
+// ========== AUTHENTICATION ==========
+async function checkAuthentication() {
+  try {
+    const user = await api.checkAuth();
+    
+    if (user) {
+      console.log('✅ User authenticated:', user);
+      updateUserGreeting(user);
+      updateApiStatus('✅ Connected', 'success');
+      hideLoginScreen();
+      return true;
+    } else {
+      console.log('⚠️ User not authenticated');
+      updateApiStatus('🔐 Not logged in', 'warning');
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ Authentication check failed:', error);
+    updateApiStatus('❌ Connection Error', 'error');
+    return false;
   }
-});
+}
+
+function showLoginScreen() {
+  console.log('🔐 Showing login screen...');
+  
+  // Hide all main content
+  document.querySelector('.main-content')?.classList.add('hidden');
+  
+  // Create and show login screen
+  const loginScreen = document.createElement('div');
+  loginScreen.id = 'login-screen';
+  loginScreen.className = 'login-screen';
+  loginScreen.innerHTML = `
+    <div class="login-container">
+      <div class="login-header">
+        <img src="msa_logo.png" alt="MSA Logo" class="login-logo" />
+        <h1>UTM MSA Marketing Command Centre</h1>
+        <div class="bismillah-login">بِسْمِ ٱللَّٰهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div>
+      </div>
+      
+      <div class="login-content">
+        <h2>السلام عليكم! 👋</h2>
+        <p>Please sign in with your Discord account to access the Marketing Command Centre.</p>
+        <p class="login-requirement">✓ You must be a member of the UTM MSA Discord server</p>
+        
+        <button class="login-button" onclick="initiateLogin()">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"/>
+          </svg>
+          Sign in with Discord
+        </button>
+        
+        <div class="login-footer">
+          <p class="ayah-login">وَقُلِ ٱعْمَلُوا۟ فَسَيَرَى ٱللَّهُ عَمَلَكُمْ</p>
+          <p class="citation-login">— At-Tawbah 9:105</p>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(loginScreen);
+}
+
+function hideLoginScreen() {
+  const loginScreen = document.getElementById('login-screen');
+  if (loginScreen) {
+    loginScreen.remove();
+  }
+  document.querySelector('.main-content')?.classList.remove('hidden');
+}
+
+function initiateLogin() {
+  console.log('🔐 Initiating Discord OAuth2 login...');
+  // Store current page so we can return after login
+  try {
+    sessionStorage.setItem('preLoginUrl', window.location.href);
+  } catch (e) {
+    console.warn('Could not save pre-login URL:', e);
+  }
+  api.login();
+}
+
+
+
+function updateUserGreeting(user) {
+  const greetingEl = document.querySelector('.user-greeting');
+  const loginBtn = document.getElementById('login-btn');
+  
+  if (greetingEl && user) {
+    greetingEl.textContent = `السلام عليكم, ${user.username}`;
+    greetingEl.style.cursor = 'pointer';
+    greetingEl.style.display = 'inline-block';
+    greetingEl.onclick = () => showUserMenu(user);
+    
+    // Hide login button when authenticated
+    if (loginBtn) {
+      loginBtn.style.display = 'none';
+    }
+  } else if (greetingEl && !user) {
+    // Show login button when not authenticated
+    greetingEl.style.display = 'none';
+    if (loginBtn) {
+      loginBtn.style.display = 'inline-block';
+      loginBtn.onclick = initiateLogin;
+    }
+  }
+}
+
+function showUserMenu(user) {
+  // Simple user menu - could be expanded
+  const menu = document.createElement('div');
+  menu.className = 'user-dropdown';
+  menu.innerHTML = `
+    <div class="user-menu-item">
+      <img src="https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png" 
+           alt="${user.username}" 
+           class="user-avatar-small">
+      <div>
+        <div class="user-menu-name">${user.username}#${user.discriminator}</div>
+        <div class="user-menu-email">${user.email || 'No email'}</div>
+      </div>
+    </div>
+    <button class="user-menu-button" onclick="window.apiService.login()">Switch Account</button>
+  `;
+  
+  // Position and show menu (simplified - you may want to add proper positioning)
+  document.body.appendChild(menu);
+  setTimeout(() => menu.remove(), 5000); // Auto-close after 5 seconds
+}
 
 // ========== INITIALIZATION ==========
 function initializeDashboard() {
-  console.log('🚀 Initializing MSA Marketing Dashboard...');
-  
   // Setup sidebar toggle for mobile
   const sidebarToggle = document.querySelector('.sidebar-toggle');
   if (sidebarToggle) {
@@ -112,14 +201,11 @@ function initializeDashboard() {
   
   // Setup event filters
   setupEventFilters();
-  
-  console.log('✅ Dashboard initialized');
 }
 
 // ========== NAVIGATION ==========
 function setupNavigation() {
   const navItems = document.querySelectorAll('.nav-item');
-  const sections = document.querySelectorAll('.content-section');
   
   navItems.forEach(item => {
     item.addEventListener('click', (e) => {
@@ -150,9 +236,6 @@ function openSection(sectionId) {
     case 'analytics':
       loadAnalytics();
       break;
-    case 'team':
-      loadTeamData();
-      break;
   }
   
   // Close mobile sidebar
@@ -179,8 +262,12 @@ function setupModeToggle() {
       logo.src = isNightMode ? "msa_logo_white.png" : "msa_logo.png";
     }
     toggleButton.textContent = isNightMode ? "☀️" : "🌙";
-    // persist user preference
-    try { localStorage.setItem('msa_theme', isNightMode ? 'dark' : 'light'); } catch (e) { /* ignore */ }
+    
+    try { 
+      localStorage.setItem('msa_theme', isNightMode ? 'dark' : 'light'); 
+    } catch (e) { 
+      console.warn('Failed to save theme preference:', e);
+    }
     
     // Update charts for night mode
     if (isNightMode) {
@@ -191,7 +278,6 @@ function setupModeToggle() {
   });
 }
 
-// Apply initial theme based on config, saved preference, or OS preference
 function applyInitialTheme() {
   try {
     const saved = localStorage.getItem('msa_theme');
@@ -203,7 +289,6 @@ function applyInitialTheme() {
     else if (configTheme === 'dark') useDark = true;
     else if (configTheme === 'light') useDark = false;
     else {
-      // auto -> follow OS preference
       useDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
 
@@ -213,142 +298,58 @@ function applyInitialTheme() {
       if (logo) logo.src = 'msa_logo_white.png';
       const toggleButton = document.getElementById('toggle-mode');
       if (toggleButton) toggleButton.textContent = '☀️';
-      updateChartsForNightMode();
-    } else {
-      document.body.classList.remove('night-mode');
-      const logo = document.getElementById('logo');
-      if (logo) logo.src = 'msa_logo.png';
-      const toggleButton = document.getElementById('toggle-mode');
-      if (toggleButton) toggleButton.textContent = '🌙';
-      updateChartsForDayMode();
     }
   } catch (e) {
-    console.warn('Theme init failed', e);
-  }
-}
-
-// ========== API FUNCTIONS ==========
-async function makeApiRequest(endpoint, options = {}) {
-  const url = `${API_CONFIG.baseUrl}${endpoint}`;
-  const defaultOptions = {
-    headers: {
-      'X-API-Key': API_CONFIG.apiKey,
-      'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': 'true'
-    }
-  };
-  
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
-  
-  try {
-    console.log(`🔄 API Request: ${url}`);
-    
-    const response = await fetch(url, { 
-      ...defaultOptions, 
-      ...options,
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-    }
-    
-    const jsonData = await response.json();
-    console.log(`📦 API Response:`, jsonData);
-    
-    return jsonData;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    console.error('API request error:', error);
-    showToast(error.message, 'error');
-    return null;
-  }
-}
-
-async function checkApiHealth() {
-  if (!FEATURES.showApiStatus) return;
-  
-  const healthData = await makeApiRequest('/api/health');
-  
-  if (healthData) {
-    console.log('✅ API Health Check:', healthData);
-    updateApiStatus('✅ Connected', 'success');
-    updateSystemStatus('api-indicator', '🟢');
-  } else {
-    updateApiStatus('❌ Disconnected', 'error');
-    updateSystemStatus('api-indicator', '🔴');
-  }
-}
-
-function updateApiStatus(message, type) {
-  const statusEl = document.getElementById('api-status');
-  if (statusEl) {
-    // Check if mobile viewport
-    const isMobile = window.innerWidth <= 768;
-    
-    if (isMobile) {
-      // Show just the icon on mobile
-      if (message.includes('Connected')) {
-        statusEl.textContent = '✅';
-      } else if (message.includes('Disconnected')) {
-        statusEl.textContent = '❌';
-      } else {
-        statusEl.textContent = '🔄';
-      }
-    } else {
-      // Show full text on desktop
-      statusEl.textContent = message;
-    }
-    
-    statusEl.className = `api-status ${type}`;
-  }
-}
-
-function updateSystemStatus(indicatorId, status) {
-  const indicator = document.getElementById(indicatorId);
-  if (indicator) {
-    indicator.textContent = status;
+    console.warn('Theme init failed:', e);
   }
 }
 
 // ========== DATA LOADING ==========
 async function loadAllData() {
   console.log('🔄 Loading all dashboard data...');
-  // Always load events first once
-  await loadEvents();
-  // Then parallelize dependent but read-only computations
-  await Promise.all([
-    loadDashboardStats(),
-    loadRecentActivity(),
-    loadMiniCalendar()
-  ]);
-  console.log('✅ All data loaded');
+  try {
+    await loadEvents();
+    await Promise.all([
+      loadDashboardStats(),
+      loadRecentActivity(),
+      loadMiniCalendar()
+    ]);
+    console.log('✅ All data loaded');
+  } catch (error) {
+    console.error('❌ Failed to load data:', error);
+    showToast('Failed to load dashboard data', 'error');
+  }
 }
 
 async function loadEvents() {
-  // Reuse in-flight promise to avoid multiple network calls
   if (eventsLoadingPromise) {
     return eventsLoadingPromise;
   }
+  
   eventsLoadingPromise = (async () => {
-    const data = await makeApiRequest('/api/events');
-    if (data && data.success && Array.isArray(data.events)) {
-      currentEvents = data.events;
+    try {
+      const requests = await api.getAllRequests();
+      console.log('📦 Raw requests from API:', requests);
+      
+      // Transform API requests to UI event format (now async to fetch Discord names)
+      currentEvents = await api.transformRequestsToEvents(requests);
+      console.log('🔄 Transformed events with Discord names:', currentEvents);
+      
       displayEvents(currentEvents);
       updateEventsSummary(currentEvents);
       return currentEvents;
-    } else {
-      console.warn('Failed to load events');
+    } catch (error) {
+      console.error('❌ Failed to load events:', error);
+      currentEvents = [];
+      displayEventsError();
       return [];
     }
   })();
+  
   try {
     return await eventsLoadingPromise;
   } finally {
-    eventsLoadingPromise = null; // allow future refreshes
+    eventsLoadingPromise = null;
   }
 }
 
@@ -359,13 +360,19 @@ function displayEvents(events) {
   container.innerHTML = '';
   
   if (events.length === 0) {
-    container.innerHTML = '<div class="loading">No events found</div>';
+    container.innerHTML = '<div class="loading">No marketing requests found. Create your first request in Discord!</div>';
     return;
   }
   
   // Group events by status
   const eventsByStatus = {};
-  const statusOrder = ['📥 In Queue', '🔄 In Progress', '⏳ Awaiting Approval', '⏳ Awaiting Posting', '✅ Done', ''];
+  const statusOrder = [
+    '📥 In Queue', 
+    '🔄 In Progress', 
+    '⏳ Awaiting Posting', 
+    '✅ Done',
+    '🚫 Blocked'
+  ];
   
   events.forEach(event => {
     const status = event.status || 'No Status';
@@ -383,11 +390,10 @@ function displayEvents(events) {
     const header = document.createElement("div");
     header.className = "status-header";
     header.innerHTML = `
-      <h3>${status || 'No Status'} (${eventsByStatus[status].length})</h3>
+      <h3>${status} (${eventsByStatus[status].length})</h3>
       <span class="collapse-icon">▼</span>
     `;
     
-    // Make entire header clickable
     header.addEventListener('click', () => toggleStatusSection(section));
     
     const content = document.createElement("div");
@@ -404,7 +410,19 @@ function displayEvents(events) {
   });
 }
 
-// Toggle status section collapse/expand
+function displayEventsError() {
+  const container = document.getElementById("task-container");
+  if (!container) return;
+  
+  container.innerHTML = `
+    <div class="loading error">
+      <p>❌ Failed to load marketing requests</p>
+      <p>Please check your connection and try again.</p>
+      <button class="action-btn" onclick="refreshData()">🔄 Retry</button>
+    </div>
+  `;
+}
+
 function toggleStatusSection(statusSection) {
   const content = statusSection.querySelector('.status-content');
   const icon = statusSection.querySelector('.collapse-icon');
@@ -421,50 +439,94 @@ function toggleStatusSection(statusSection) {
 }
 
 function createEventCard(event) {
-  const dueDate = new Date(event.posting_date);
-  const daysUntilDue = Math.ceil((dueDate - new Date()) / (1000 * 60 * 60 * 24));
+  const dueDate = new Date(event.posting_date + 'T00:00:00');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
   const isOverdue = daysUntilDue < 0;
   const isUrgent = daysUntilDue <= 2 && daysUntilDue >= 0;
   
   const urgencyClass = isOverdue ? 'overdue' : isUrgent ? 'urgent' : '';
-  const discordLink = generateDiscordChannelLink(event);
+  const urgencyText = isOverdue ? 
+    `⚠️ ${Math.abs(daysUntilDue)} days overdue` : 
+    isUrgent ? 
+      `🔥 ${daysUntilDue} days left` : 
+      `📅 ${daysUntilDue} days until due`;
+  
+  const statusColor = api.getStatusColor(event.status);
+  const discordLink = api.generateDiscordChannelLink(event.channelID);
   
   const card = document.createElement('div');
-  card.className = `event-card ${urgencyClass}`;
+  card.className = `modern-event-card ${urgencyClass}`;
   card.innerHTML = `
-    <div class="event-header">
-      <div class="event-title">${event.title}</div>
-      <div class="event-type">${formatRequestType(event.request_type)}</div>
-    </div>
-    <div class="event-details">
-      <div><strong>Description:</strong> ${event.description}</div>
-      <div><strong>Department:</strong> ${event.department || 'N/A'}${event.subgroup ? ` (${event.subgroup})` : ''}</div>
-      <div><strong>Assigned to:</strong> ${event.assigned_to_name || 'Unassigned'}</div>
-      <div><strong>Due Date:</strong> 
-        <span class="due-date ${urgencyClass}">
-          ${dueDate.toLocaleDateString()} 
-          ${isOverdue ? `(${Math.abs(daysUntilDue)} days overdue!)` : 
-            isUrgent ? `(${daysUntilDue} days left!)` : 
-            `(${daysUntilDue} days left)`}
+    <div class="event-card-header">
+      <div class="event-card-badges">
+        <span class="event-card-type-badge">${api.formatRequestType(event.request_type)}</span>
+        <span class="event-card-status-badge" style="background-color: ${statusColor}20; color: ${statusColor}; border-color: ${statusColor}">
+          ${event.status || 'No Status'}
         </span>
       </div>
-      <div><strong>Status:</strong> ${event.status || 'No Status'}</div>
-      <div><strong>Discord:</strong> 
-        <a href="${discordLink}" target="_blank" class="discord-link">
-          💬 View in Discord
+      ${urgencyClass ? `<div class="event-card-urgency ${urgencyClass}">${urgencyText}</div>` : ''}
+    </div>
+    
+    <h3 class="event-card-title">${escapeHtml(event.title)}</h3>
+    
+    <p class="event-card-description">${escapeHtml(event.description) || 'No description provided'}</p>
+    
+    <div class="event-card-grid">
+      <div class="event-card-detail">
+        <div class="event-card-detail-icon">👥</div>
+        <div class="event-card-detail-content">
+          <div class="event-card-detail-label">Requested By</div>
+          <div class="event-card-detail-value">${escapeHtml(event.requester_name || 'Unknown')}</div>
+          ${event.department || event.requester_department_name ? `<div class="event-card-detail-sub">${escapeHtml(event.department || event.requester_department_name)}</div>` : ''}
+        </div>
+      </div>
+      
+      <div class="event-card-detail">
+        <div class="event-card-detail-icon">👤</div>
+        <div class="event-card-detail-content">
+          <div class="event-card-detail-label">Assigned To</div>
+          <div class="event-card-detail-value">${escapeHtml(event.assigned_to_name) || 'Unassigned'}</div>
+        </div>
+      </div>
+      
+      <div class="event-card-detail">
+        <div class="event-card-detail-icon">📅</div>
+        <div class="event-card-detail-content">
+          <div class="event-card-detail-label">Due Date</div>
+          <div class="event-card-detail-value">${dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+        </div>
+      </div>
+      
+      ${event.room ? `
+      <div class="event-card-detail">
+        <div class="event-card-detail-icon">📍</div>
+        <div class="event-card-detail-content">
+          <div class="event-card-detail-label">Location</div>
+          <div class="event-card-detail-value">${escapeHtml(event.room)}</div>
+        </div>
+      </div>
+      ` : ''}
+    </div>
+    
+    <div class="event-card-footer">
+      <div class="event-card-meta">
+        <small>Created ${new Date(event.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</small>
+      </div>
+      <div class="event-card-actions">
+        ${event.signup_url ? `<a href="${escapeHtml(event.signup_url)}" target="_blank" class="event-card-action-btn signup-btn" onclick="event.stopPropagation()">
+          🔗 Signup
+        </a>` : ''}
+        <a href="${discordLink}" target="_blank" class="event-card-action-btn discord-btn" onclick="event.stopPropagation()">
+          💬 Discord
         </a>
       </div>
-      ${event.notes ? `<div><strong>Notes:</strong> ${event.notes}</div>` : ''}
-    </div>
-    <div class="event-meta">
-      <small>Created: ${new Date(event.created_at).toLocaleDateString()}</small>
     </div>
   `;
   
-  // Add click handler to show modal
   card.addEventListener('click', (e) => {
-    // Don't open modal if user clicked on the Discord link
-    if (!e.target.closest('.discord-link')) {
+    if (!e.target.closest('.event-card-action-btn')) {
       showEventModal(event);
     }
   });
@@ -476,23 +538,26 @@ function updateEventsSummary(events) {
   const summaryContainer = document.getElementById('events-summary');
   if (!summaryContainer) return;
   
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
   const statusCounts = {
     total: events.length,
-    pending: events.filter(e => !e.status || e.status.includes('Queue') || e.status.includes('Progress') || e.status.includes('Awaiting')).length,
+    pending: events.filter(e => e.status && !e.status.includes('Done')).length,
     completed: events.filter(e => e.status && e.status.includes('Done')).length,
     overdue: events.filter(e => {
       const dueDate = new Date(e.posting_date);
       const isDone = e.status && e.status.includes('Done');
-      return dueDate < new Date() && !isDone;
+      return dueDate < today && !isDone;
     }).length
   };
   
   summaryContainer.innerHTML = `
-    <h3>📊 Events Summary</h3>
+    <h3>📊 Request Summary</h3>
     <div class="summary-stats">
       <div class="summary-stat">
         <span class="summary-number">${statusCounts.total}</span>
-        <span class="summary-label">Total Events</span>
+        <span class="summary-label">Total Requests</span>
       </div>
       <div class="summary-stat">
         <span class="summary-number">${statusCounts.pending}</span>
@@ -502,7 +567,7 @@ function updateEventsSummary(events) {
         <span class="summary-number">${statusCounts.completed}</span>
         <span class="summary-label">Completed</span>
       </div>
-      <div class="summary-stat">
+      <div class="summary-stat ${statusCounts.overdue > 0 ? 'overdue' : ''}">
         <span class="summary-number">${statusCounts.overdue}</span>
         <span class="summary-label">Overdue</span>
       </div>
@@ -515,18 +580,20 @@ async function loadDashboardStats() {
   const events = currentEvents;
   if (!events || events.length === 0) return;
   
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
   const stats = {
     total: events.length,
-    pending: events.filter(e => !e.status || !e.status.includes('Done')).length,
+    pending: events.filter(e => e.status && !e.status.includes('Done')).length,
     completed: events.filter(e => e.status && e.status.includes('Done')).length,
     overdue: events.filter(e => {
       const dueDate = new Date(e.posting_date);
       const isDone = e.status && e.status.includes('Done');
-      return dueDate < new Date() && !isDone;
+      return dueDate < today && !isDone;
     }).length
   };
   
-  // Update dashboard stats
   updateElement('total-events', stats.total);
   updateElement('pending-events', stats.pending);
   updateElement('completed-events', stats.completed);
@@ -544,6 +611,7 @@ function updateElement(id, value) {
 async function loadRecentActivity() {
   const events = currentEvents;
   if (!events || events.length === 0) return;
+  
   const recentEvents = events
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
     .slice(0, 5);
@@ -557,10 +625,10 @@ async function loadRecentActivity() {
   }
   
   container.innerHTML = recentEvents.map(event => `
-    <div class="recent-item">
-      <div class="recent-title">${event.title}</div>
+    <div class="recent-item" onclick="showEventModal(${JSON.stringify(event).replace(/"/g, '&quot;')})">
+      <div class="recent-title">${escapeHtml(event.title)}</div>
       <div class="recent-meta">
-        ${formatRequestType(event.request_type)} • ${new Date(event.created_at).toLocaleDateString()}
+        ${api.formatRequestType(event.request_type)} • ${new Date(event.created_at).toLocaleDateString()}
       </div>
     </div>
   `).join('');
@@ -568,10 +636,24 @@ async function loadRecentActivity() {
 
 // ========== CALENDAR FUNCTIONS ==========
 async function loadMiniCalendar() {
-  // Placeholder for mini calendar - could implement a simple month view
   const container = document.getElementById('mini-calendar');
   if (container) {
-    container.innerHTML = '<div class="text-center">Mini calendar coming soon</div>';
+    const today = new Date();
+    const monthName = today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const upcomingCount = currentEvents.filter(e => {
+      const dueDate = new Date(e.posting_date);
+      return dueDate >= today && !e.status?.includes('Done');
+    }).length;
+    
+    container.innerHTML = `
+      <div class="mini-calendar-content">
+        <div class="mini-calendar-month">${monthName}</div>
+        <div class="mini-calendar-stat">
+          <span class="mini-calendar-number">${upcomingCount}</span>
+          <span class="mini-calendar-label">Upcoming Deadlines</span>
+        </div>
+      </div>
+    `;
   }
 }
 
@@ -579,7 +661,6 @@ async function loadMainCalendar() {
   const calendarEl = document.getElementById("main-calendar");
   if (!calendarEl) return;
   
-  // Prevent multiple simultaneous calendar loads
   if (calendarLoading) {
     console.log('⏸️ Calendar already loading, skipping...');
     return;
@@ -589,7 +670,6 @@ async function loadMainCalendar() {
   console.log('🔄 Loading main calendar...');
   
   try {
-    // Destroy previous instance completely
     if (currentCalendar) {
       try {
         currentCalendar.destroy();
@@ -599,47 +679,42 @@ async function loadMainCalendar() {
       }
     }
     
-    // Clear the calendar container to ensure no leftover elements
     calendarEl.innerHTML = '';
     
     const events = currentEvents.length > 0 ? currentEvents : await loadEvents();
     
     console.log(`📅 Creating calendar with ${events.length} events`);
     
-    // Convert API events to calendar format
     const calendarEvents = events.map(event => {
-      const rawId = (event.id && String(event.id)) || generateStableEventId(event);
       const dueDate = new Date(event.posting_date);
-      const isOverdue = dueDate < new Date();
-      const isUrgent = Math.ceil((dueDate - new Date()) / (1000 * 60 * 60 * 24)) <= 2;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const isOverdue = dueDate < today;
+      const daysUntil = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+      const isUrgent = daysUntil <= 2 && daysUntil >= 0;
       
       return {
-        id: `event-${rawId}`,
-        title: `${event.title}${event.status ? ` (${event.status})` : ' (No Status)'}`,
-        start: event.posting_date.split('T')[0],
+        id: `event-${event.channelID}`,
+        title: event.title,
+        start: event.posting_date,
         extendedProps: {
           description: event.description,
           assignedTo: event.assigned_to_name,
-          requester: event.requester_name,
-          department: event.department,
           status: event.status,
           requestType: event.request_type,
-          notes: event.notes,
+          room: event.room,
+          signupUrl: event.signup_url,
           originalEvent: event
         },
-        backgroundColor: getEventColor(event.status),
-        borderColor: getEventColor(event.status),
+        backgroundColor: api.getStatusColor(event.status),
+        borderColor: api.getStatusColor(event.status),
         classNames: [
           isOverdue ? 'event-overdue' : '',
-          isUrgent ? 'event-urgent' : '',
-          `status-${normalizeStatusForCSS(event.status)}`
+          isUrgent ? 'event-urgent' : ''
         ].filter(Boolean)
       };
     });
     
-    console.log(`📅 Calendar events created: ${calendarEvents.length}`);
-    
-  // Create new calendar instance
     currentCalendar = new FullCalendar.Calendar(calendarEl, {
       initialView: "dayGridMonth",
       height: "auto",
@@ -653,14 +728,7 @@ async function loadMainCalendar() {
         showEventModal(info.event.extendedProps.originalEvent);
       },
       eventDidMount: function(info) {
-        // Store reference id for tooltip management
-        info.el.dataset.tooltipEventId = info.event.id;
-      },
-      eventMouseEnter: function(info) {
-        showCalendarTooltip(info);
-      },
-      eventMouseLeave: function(info) {
-        hideCalendarTooltip(info);
+        info.el.setAttribute('title', info.event.title);
       }
     });
     
@@ -671,69 +739,12 @@ async function loadMainCalendar() {
   }
 }
 
-// ========== HELPER FUNCTIONS ==========
-function normalizeStatusForCSS(status) {
-  if (!status || status === '') return 'nostatus';
-  return status.replace(/[^a-zA-Z]/g, '').toLowerCase();
-}
-
-function getEventColor(status) {
-  const statusColors = {
-    '📥 In Queue': '#6c757d',
-    '🔄 In Progress': '#007bff',
-    '⏳ Awaiting Approval': '#ffc107',
-    '⏳ Awaiting Posting': '#ffc107',
-    '✅ Done': '#28a745',
-    '': '#6c757d',
-    'No Status': '#6c757d'
-  };
-  
-  return statusColors[status] || '#6c757d';
-}
-
-function generateDiscordChannelLink(event) {
-  const guildId = '1165706299393183754';
-  // Use channel_id if available, or generate a placeholder link
-  const channelId = event.channel_id || event.id || 'unknown';
-  return `https://discord.com/channels/${guildId}/${channelId}`;
-}
-
-// Calendar tooltip management
-let activeCalTooltip = null;
-function showCalendarTooltip(info) {
-  const props = info.event.extendedProps;
-  hideCalendarTooltip();
-  const tooltip = document.createElement('div');
-  tooltip.className = 'fc-tooltip global';
-  tooltip.innerHTML = `
-    <strong>${info.event.title}</strong><br>
-    ${(props.department || '')} ${formatRequestType(props.requestType) || ''}<br>
-    ${props.assignedTo ? 'Assigned: ' + props.assignedTo : ''}
-  `;
-  document.body.appendChild(tooltip);
-  // Position near mouse/event element
-  const rect = info.el.getBoundingClientRect();
-  const top = window.scrollY + rect.top + rect.height + 4;
-  const left = window.scrollX + rect.left;
-  tooltip.style.position = 'absolute';
-  tooltip.style.top = `${top}px`;
-  tooltip.style.left = `${left}px`;
-  tooltip.style.opacity = '1';
-  activeCalTooltip = tooltip;
-}
-function hideCalendarTooltip() {
-  if (activeCalTooltip) {
-    activeCalTooltip.remove();
-    activeCalTooltip = null;
-  }
-}
-
-// ========== KANBAN BOARD FUNCTIONS ==========
+// ========== KANBAN BOARD ==========
 async function loadKanbanBoard() {
   try {
     if (!currentEvents || currentEvents.length === 0) {
       document.getElementById('kanban-container').innerHTML = '<div class="loading">🔄 Loading data...</div>';
-      return;
+      await loadEvents();
     }
     
     displayKanbanBoard(currentEvents);
@@ -747,45 +758,27 @@ function displayKanbanBoard(events) {
   const container = document.getElementById('kanban-container');
   if (!container) return;
   
-  // Define the columns/statuses
   const statuses = [
     '📥 In Queue',
     '🔄 In Progress', 
-    '⏳ Awaiting Approval',
     '⏳ Awaiting Posting',
-    '✅ Done'
+    '✅ Done',
+    '🚫 Blocked'
   ];
   
-  // Filter events by department if filter is set
-  const departmentFilter = document.getElementById('kanban-filter')?.value;
-  const filteredEvents = departmentFilter ? 
-    events.filter(event => event.department_key === departmentFilter) : 
-    events;
-  
-  // Group events by status
   const eventsByStatus = statuses.reduce((acc, status) => {
-    acc[status] = filteredEvents.filter(event => event.status === status);
+    acc[status] = events.filter(event => event.status === status);
     return acc;
   }, {});
   
-  // Create the Kanban columns
   container.innerHTML = statuses.map(status => {
     const statusEvents = eventsByStatus[status] || [];
-    const cards = statusEvents.map((event, index) => {
-      // Find the index in filteredEvents array
-      const eventIndex = filteredEvents.findIndex(e => 
-        (e.id && e.id === event.id) || 
-        (e.title === event.title && e.posting_date === event.posting_date)
-      );
-      return createKanbanCard(event, eventIndex);
-    }).join('');
+    const cards = statusEvents.map(event => createKanbanCard(event)).join('');
     
     return `
       <div class="kanban-column" data-status="${status}">
         <div class="kanban-header">
-          <div class="kanban-title">
-            ${status}
-          </div>
+          <div class="kanban-title">${status}</div>
           <div class="kanban-count">${statusEvents.length}</div>
         </div>
         <div class="kanban-cards">
@@ -795,22 +788,21 @@ function displayKanbanBoard(events) {
     `;
   }).join('');
   
-  // Add click handlers to cards
-  container.querySelectorAll('.kanban-card').forEach((card, index) => {
+  // Add click handlers
+  container.querySelectorAll('.kanban-card').forEach(card => {
     card.addEventListener('click', () => {
-      // Get event index from data attribute
-      const eventIndex = parseInt(card.dataset.eventIndex, 10);
-      const eventData = filteredEvents[eventIndex];
-      if (eventData) {
-        showEventModal(eventData);
-      }
+      const eventId = card.dataset.eventId; // Keep as string!
+      const event = events.find(e => String(e.channelID) === eventId);
+      if (event) showEventModal(event);
     });
   });
 }
 
-function createKanbanCard(event, eventIndex) {
+function createKanbanCard(event) {
   const dueDate = new Date(event.posting_date);
-  const daysUntilDue = Math.ceil((dueDate - new Date()) / (1000 * 60 * 60 * 24));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
   const isOverdue = daysUntilDue < 0;
   const isUrgent = daysUntilDue <= 2 && daysUntilDue >= 0;
   
@@ -821,26 +813,15 @@ function createKanbanCard(event, eventIndex) {
       `${daysUntilDue} days left` : 
       `Due ${dueDate.toLocaleDateString()}`;
   
-  // Escape HTML to prevent XSS and broken attributes
-  const escapeHtml = (str) => {
-    if (!str) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  };
-  
   return `
-    <div class="kanban-card" data-event-index="${eventIndex}">
-      <div class="kanban-card-type">${formatRequestType(event.request_type)}</div>
+    <div class="kanban-card" data-event-id="${event.channelID}">
+      <div class="kanban-card-type">${api.formatRequestType(event.request_type)}</div>
       <div class="kanban-card-title">${escapeHtml(event.title)}</div>
-      <div class="kanban-card-department">${escapeHtml(event.department_name) || 'N/A'}</div>
+      <div class="kanban-card-department">${escapeHtml(event.department || event.requester_department_name || 'No Department')}</div>
       <div class="kanban-card-meta">
         <div class="kanban-card-due ${dueDateClass}">${dueDateText}</div>
         ${event.assigned_to_name ? `<div>👤 ${escapeHtml(event.assigned_to_name)}</div>` : '<div>👤 Unassigned</div>'}
-        ${event.location ? `<div>📍 ${escapeHtml(event.location)}</div>` : ''}
+        ${event.room ? `<div>📍 ${escapeHtml(event.room)}</div>` : ''}
       </div>
     </div>
   `;
@@ -850,47 +831,165 @@ function refreshKanban() {
   loadKanbanBoard();
 }
 
-// Setup Kanban filter
-document.addEventListener('DOMContentLoaded', () => {
-  const kanbanFilter = document.getElementById('kanban-filter');
-  if (kanbanFilter) {
-    kanbanFilter.addEventListener('change', () => {
-      displayKanbanBoard(currentEvents);
-    });
-  }
-});
-
-// ========== MODAL FUNCTIONS ==========
+// ========== MODAL ==========
 function showEventModal(event) {
-  const discordLink = generateDiscordChannelLink(event);
+  const discordLink = api.generateDiscordChannelLink(event.channelID);
+  // Parse date as local date to avoid timezone offset issues
+  const dueDate = new Date(event.posting_date + 'T00:00:00');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+  const isOverdue = daysUntilDue < 0;
+  const isUrgent = daysUntilDue <= 2 && daysUntilDue >= 0;
+  
+  const urgencyClass = isOverdue ? 'overdue' : isUrgent ? 'urgent' : '';
+  const urgencyText = isOverdue ? 
+    `⚠️ ${Math.abs(daysUntilDue)} days overdue` : 
+    isUrgent ? 
+      `🔥 ${daysUntilDue} days left` : 
+      `📅 ${daysUntilDue} days until due`;
+  
+  // Status badge color
+  const statusColor = api.getStatusColor(event.status);
   
   const modal = document.createElement('div');
   modal.className = 'modal-overlay';
   modal.innerHTML = `
-    <div class="modal">
-      <button class="modal-close">×</button>
-      <h2>${event.title}</h2>
-      <div class="modal-details">
-        <p><strong>Description:</strong> ${event.description || 'N/A'}</p>
-        <p><strong>Due Date:</strong> ${new Date(event.posting_date).toLocaleDateString()}</p>
-        <p><strong>Status:</strong> ${event.status || 'No Status'}</p>
-        <p><strong>Type:</strong> ${formatRequestType(event.request_type) || 'N/A'}</p>
-        <p><strong>Department:</strong> ${event.department || 'N/A'}</p>
-        <p><strong>Assigned to:</strong> ${event.assigned_to_name || 'Unassigned'}</p>
-        <p><strong>Discord Channel:</strong> 
-          <a href="${discordLink}" target="_blank" class="discord-link">
-            💬 Open in Discord
+    <div class="modal modern-modal">
+      <button class="modal-close" aria-label="Close">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+      
+      <div class="modal-header">
+        <div class="modal-title-section">
+          <div class="modal-type-badge">${api.formatRequestType(event.request_type)}</div>
+          <h2 class="modal-title">${escapeHtml(event.title)}</h2>
+        </div>
+        <div class="modal-status-badge" style="background-color: ${statusColor}20; color: ${statusColor}; border-color: ${statusColor}">
+          ${event.status || 'No Status'}
+        </div>
+      </div>
+      
+      <div class="modal-body">
+        <!-- Description Section -->
+        <div class="modal-section">
+          <div class="modal-section-header">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            <h3>Description</h3>
+          </div>
+          <p class="modal-description">${escapeHtml(event.description) || 'No description provided'}</p>
+        </div>
+        
+        <!-- Details Grid -->
+        <div class="modal-details-grid">
+          <!-- Due Date Card -->
+          <div class="modal-detail-card ${urgencyClass}">
+            <div class="modal-detail-icon">📅</div>
+            <div class="modal-detail-content">
+              <div class="modal-detail-label">Due Date</div>
+              <div class="modal-detail-value">${dueDate.toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}</div>
+              <div class="modal-detail-sub ${urgencyClass}">${urgencyText}</div>
+            </div>
+          </div>
+          
+          <!-- Requester Card -->
+          <div class="modal-detail-card">
+            <div class="modal-detail-icon">👥</div>
+            <div class="modal-detail-content">
+              <div class="modal-detail-label">Requested By</div>
+              <div class="modal-detail-value">${escapeHtml(event.requester_name || 'Unknown')}</div>
+              ${event.department || event.requester_department_name ? `<div class="modal-detail-sub">${escapeHtml(event.department || event.requester_department_name)}</div>` : ''}
+            </div>
+          </div>
+          
+          <!-- Assigned To Card -->
+          <div class="modal-detail-card">
+            <div class="modal-detail-icon">👤</div>
+            <div class="modal-detail-content">
+              <div class="modal-detail-label">Assigned To</div>
+              <div class="modal-detail-value">${escapeHtml(event.assigned_to_name) || 'Unassigned'}</div>
+              ${event.assigned_to_id ? `<div class="modal-detail-sub">ID: ${event.assigned_to_id}</div>` : ''}
+            </div>
+          </div>
+          
+          ${event.room ? `
+          <!-- Room Card -->
+          <div class="modal-detail-card">
+            <div class="modal-detail-icon">📍</div>
+            <div class="modal-detail-content">
+              <div class="modal-detail-label">Location</div>
+              <div class="modal-detail-value">${escapeHtml(event.room)}</div>
+            </div>
+          </div>
+          ` : ''}
+          
+          <!-- Created Date Card -->
+          <div class="modal-detail-card">
+            <div class="modal-detail-icon">🕒</div>
+            <div class="modal-detail-content">
+              <div class="modal-detail-label">Created</div>
+              <div class="modal-detail-value">${new Date(event.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+              <div class="modal-detail-sub">${new Date(event.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Action Links -->
+        <div class="modal-actions">
+          <a href="${discordLink}" target="_blank" class="modal-action-btn primary">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"/>
+            </svg>
+            Open in Discord
           </a>
-        </p>
-        ${event.notes ? `<p><strong>Notes:</strong> ${event.notes}</p>` : ''}
-        <p><strong>Created:</strong> ${new Date(event.created_at).toLocaleDateString()}</p>
+          ${event.signup_url ? `
+          <a href="${escapeHtml(event.signup_url)}" target="_blank" class="modal-action-btn secondary">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+            Open Signup Form
+          </a>
+          ` : ''}
+        </div>
+        
+        <!-- Metadata Footer -->
+        <div class="modal-metadata">
+          <div class="modal-metadata-item">
+            <span class="modal-metadata-label">Channel ID:</span>
+            <span class="modal-metadata-value">${event.channelID}</span>
+          </div>
+          <div class="modal-metadata-item">
+            <span class="modal-metadata-label">Last Updated:</span>
+            <span class="modal-metadata-value">${new Date(event.updated_at || event.created_at).toLocaleDateString()} at ${new Date(event.updated_at || event.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+        </div>
       </div>
     </div>
   `;
 
   document.body.appendChild(modal);
   
-  const close = () => modal.remove();
+  // Add entrance animation
+  requestAnimationFrame(() => {
+    modal.classList.add('modal-active');
+  });
+  
+  const close = () => {
+    modal.classList.remove('modal-active');
+    setTimeout(() => modal.remove(), 300);
+  };
+  
   modal.querySelector('.modal-close').onclick = close;
   modal.onclick = e => { if (e.target === modal) close(); };
   document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); }, { once: true });
@@ -898,7 +997,6 @@ function showEventModal(event) {
 
 // ========== ANALYTICS ==========
 function initializeCharts() {
-  // Chart.js configuration will be added here
   console.log('📊 Charts initialized');
 }
 
@@ -917,7 +1015,6 @@ function updateStatusChart() {
   const canvas = document.getElementById('statusChart');
   if (!canvas) return;
   
-  // Destroy existing chart
   if (charts.status) {
     charts.status.destroy();
   }
@@ -937,7 +1034,7 @@ function updateStatusChart() {
       datasets: [{
         data: Object.values(statusCounts),
         backgroundColor: [
-          '#3498db', '#f39c12', '#9b59b6', '#27ae60', '#6c757d'
+          '#007bff', '#ffc107', '#28a745', '#dc3545', '#6c757d'
         ]
       }]
     },
@@ -957,9 +1054,8 @@ function updateTimelineChart() {
   }
   
   const ctx = canvas.getContext('2d');
-  
-  // Group events by month
   const monthCounts = {};
+  
   currentEvents.forEach(event => {
     const month = new Date(event.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
     monthCounts[month] = (monthCounts[month] || 0) + 1;
@@ -970,7 +1066,7 @@ function updateTimelineChart() {
     data: {
       labels: Object.keys(monthCounts),
       datasets: [{
-        label: 'Events Created',
+        label: 'Requests Created',
         data: Object.values(monthCounts),
         borderColor: '#007bff',
         backgroundColor: 'rgba(0, 123, 255, 0.1)',
@@ -1018,18 +1114,16 @@ function updateTypeChart() {
 }
 
 function updateMetrics() {
-  // Calculate metrics
   const completedEvents = currentEvents.filter(e => e.status && e.status.includes('Done'));
   const totalEvents = currentEvents.length;
   const successRate = totalEvents > 0 ? Math.round((completedEvents.length / totalEvents) * 100) : 0;
   
-  updateElement('avg-completion', '5 days'); // Placeholder
+  updateElement('avg-completion', '5 days');
   updateElement('success-rate', `${successRate}%`);
-  updateElement('peak-day', 'Monday'); // Placeholder
+  updateElement('peak-day', 'Monday');
 }
 
 function updateChartsForNightMode() {
-  // Update chart colors for night mode
   Object.values(charts).forEach(chart => {
     if (chart && chart.options) {
       chart.options.plugins = chart.options.plugins || {};
@@ -1041,7 +1135,6 @@ function updateChartsForNightMode() {
 }
 
 function updateChartsForDayMode() {
-  // Update chart colors for day mode
   Object.values(charts).forEach(chart => {
     if (chart && chart.options) {
       chart.options.plugins = chart.options.plugins || {};
@@ -1050,74 +1143,6 @@ function updateChartsForDayMode() {
       chart.update();
     }
   });
-}
-
-// ========== TEAM DATA ==========
-async function loadTeamData() {
-  const container = document.getElementById('team-roles');
-  if (!container) return;
-  
-  // Real team members data for 2025-2026
-  const teamMembers = [
-    // Marketing Directors
-    { name: 'Ibrahim Chehab', role: 'Marketing Director', year: '4th', gender: 'Brother', avatar: '👨‍💼' },
-    { name: 'Farah Ismail', role: 'Marketing Director', year: '3rd', gender: 'Sister', avatar: '👩‍💼' },
-    
-    // Social Media Managers
-    { name: 'Nadia Silim', role: 'Social Media Manager', year: '1st', gender: 'Sister', avatar: '👩‍💻' },
-    { name: 'Wafa Malik', role: 'Social Media Manager', year: '2nd', gender: 'Sister', avatar: '👩‍💻' },
-    { name: 'Rocio Escalante', role: 'Social Media Manager', year: '3rd', gender: 'Sister', avatar: '👩‍💻' },
-    
-    // Content Creators
-    { name: 'Mustafa Sajjad', role: 'Content Creator', year: '5+', gender: 'Brother', avatar: '👨‍✍️' },
-    { name: 'Faris Khalili', role: 'Content Creator', year: '5+', gender: 'Brother', avatar: '👨‍✍️' },
-    { name: 'Zunairah Khan', role: 'Content Creator', year: '2nd', gender: 'Sister', avatar: '👩‍✍️' },
-    { name: 'Ayesha Wahab', role: 'Content Creator', year: '1st', gender: 'Sister', avatar: '👩‍✍️' },
-    
-    // Graphic Designers
-    { name: 'Wakeel Ibrahim', role: 'Graphic Designer', year: '2nd', gender: 'Brother', avatar: '👨‍🎨' },
-    { name: 'Zoha Fatima Quadry', role: 'Graphic Designer', year: '2nd', gender: 'Sister', avatar: '👩‍🎨' },
-    { name: 'Jasra Irfan', role: 'Graphic Designer', year: '4th', gender: 'Sister', avatar: '👩‍🎨' },
-    { name: 'Taimaa Al Nemer', role: 'Graphic Designer', year: '4th', gender: 'Sister', avatar: '👩‍🎨' },
-    { name: 'Fahmi Masnun Ashraf', role: 'Graphic Designer', year: '2nd', gender: 'Sister', avatar: '👩‍🎨' },
-    { name: 'Haleema Khalid', role: 'Graphic Designer', year: '3rd', gender: 'Sister', avatar: '👩‍🎨' },
-    
-    // Photographer
-    { name: 'Fathima Karim', role: 'Photographer', year: '3rd', gender: 'Sister', avatar: '👩‍📷' }
-  ];
-
-  // Group members by role for better organization
-  const roleGroups = teamMembers.reduce((groups, member) => {
-    const role = member.role;
-    if (!groups[role]) groups[role] = [];
-    groups[role].push(member);
-    return groups;
-  }, {});
-
-  // Generate HTML grouped by role in horizontal layout
-  const roleOrder = ['Marketing Director', 'Social Media Manager', 'Content Creator', 'Graphic Designer', 'Photographer'];
-  
-  container.innerHTML = roleOrder.map(role => {
-    if (!roleGroups[role]) return '';
-    
-    return `
-      <div class="role-section">
-        <h3 class="role-title">${role}${roleGroups[role].length > 1 ? 's' : ''}</h3>
-        <div class="team-horizontal-grid">
-          ${roleGroups[role].map(member => `
-            <div class="team-card">
-              <div class="team-avatar">${member.avatar}</div>
-              <div class="team-info">
-                <div class="team-name">${member.name}</div>
-                <div class="team-role">${member.role}</div>
-                <div class="team-year">${member.year} Year ${member.gender}</div>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
-  }).join('');
 }
 
 // ========== EVENT FILTERS ==========
@@ -1154,38 +1179,68 @@ function showToast(message, type = 'success') {
   }, 3000);
 }
 
+function updateApiStatus(message, type) {
+  const statusEl = document.getElementById('api-status');
+  if (statusEl) {
+    const isMobile = window.innerWidth <= 768;
+    
+    if (isMobile) {
+      if (message.includes('Connected')) {
+        statusEl.textContent = '✅';
+      } else if (message.includes('Error') || message.includes('Disconnected')) {
+        statusEl.textContent = '❌';
+      } else if (message.includes('Not logged in')) {
+        statusEl.textContent = '🔐';
+      } else {
+        statusEl.textContent = '🔄';
+      }
+    } else {
+      statusEl.textContent = message;
+    }
+    
+    statusEl.className = `api-status ${type}`;
+  }
+}
+
 function refreshData() {
   showToast('Refreshing data...', 'info');
+  eventsLoadingPromise = null; // Clear cache
   loadAllData().then(() => {
-    // If we're currently viewing the calendar, refresh it with new data
     const calendarSection = document.getElementById('calendar');
     if (calendarSection && calendarSection.classList.contains('active')) {
-      console.log('📅 Refreshing calendar with new data');
       loadMainCalendar();
     }
+    const kanbanSection = document.getElementById('kanban');
+    if (kanbanSection && kanbanSection.classList.contains('active')) {
+      loadKanbanBoard();
+    }
+    showToast('Data refreshed!', 'success');
   });
 }
 
 function exportEvents() {
   const csv = convertToCSV(currentEvents);
-  downloadCSV(csv, 'msa-events.csv');
-  showToast('Events exported successfully!');
+  downloadCSV(csv, 'msa-marketing-requests.csv');
+  showToast('Requests exported successfully!');
 }
 
 function convertToCSV(events) {
-  const headers = ['Title', 'Description', 'Status', 'Due Date', 'Assigned To', 'Requester', 'Type'];
+  const headers = ['Channel ID', 'Title', 'Description', 'Status', 'Type', 'Due Date', 'Assigned To', 'Room', 'Signup URL', 'Created'];
   const rows = events.map(event => [
+    event.channelID,
     event.title,
-    event.description,
+    event.description || '',
     event.status || 'No Status',
+    event.request_type || '',
     event.posting_date,
     event.assigned_to_name || 'Unassigned',
-    event.requester_name || 'N/A',
-    formatRequestType(event.request_type) || 'N/A'
+    event.room || '',
+    event.signup_url || '',
+    event.created_at
   ]);
   
   return [headers, ...rows].map(row => 
-    row.map(field => `"${field}"`).join(',')
+    row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
   ).join('\n');
 }
 
@@ -1201,6 +1256,13 @@ function downloadCSV(csv, filename) {
   document.body.removeChild(a);
 }
 
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 // ========== API TESTING ==========
 async function testApiConnection() {
   const resultsDiv = document.getElementById('api-test-results');
@@ -1208,15 +1270,18 @@ async function testApiConnection() {
   
   resultsDiv.innerHTML = '<div class="loading">Testing API connection...</div>';
   
-  const healthData = await makeApiRequest('/api/health');
-  
-  if (healthData) {
+  try {
+    const user = await api.checkAuth();
     resultsDiv.innerHTML = `
-      <div class="success">✅ API Health Check Successful</div>
-      <pre>${JSON.stringify(healthData, null, 2)}</pre>
+      <div class="success">✅ API Connection Successful</div>
+      <div>Authenticated as: ${user ? user.username : 'Not logged in'}</div>
+      <pre>${JSON.stringify(user, null, 2)}</pre>
     `;
-  } else {
-    resultsDiv.innerHTML = '<div class="error">❌ API Health Check Failed</div>';
+  } catch (error) {
+    resultsDiv.innerHTML = `
+      <div class="error">❌ API Connection Failed</div>
+      <div>${error.message}</div>
+    `;
   }
 }
 
@@ -1224,28 +1289,48 @@ async function testApiEvents() {
   const resultsDiv = document.getElementById('api-test-results');
   if (!resultsDiv) return;
   
-  resultsDiv.innerHTML = '<div class="loading">Testing events endpoint...</div>';
+  resultsDiv.innerHTML = '<div class="loading">Testing requests endpoint...</div>';
   
-  const eventsData = await makeApiRequest('/api/events');
-  
-  if (eventsData && eventsData.success) {
+  try {
+    const requests = await api.getAllRequests();
     resultsDiv.innerHTML = `
-      <div class="success">✅ Events Endpoint Successful</div>
-      <div>Found ${eventsData.count} events</div>
-      <pre>${JSON.stringify(eventsData, null, 2)}</pre>
+      <div class="success">✅ Requests Endpoint Successful</div>
+      <div>Found ${requests.length} requests</div>
+      <pre>${JSON.stringify(requests.slice(0, 2), null, 2)}</pre>
     `;
-  } else {
-    resultsDiv.innerHTML = '<div class="error">❌ Events Endpoint Failed</div>';
+  } catch (error) {
+    resultsDiv.innerHTML = `
+      <div class="error">❌ Requests Endpoint Failed</div>
+      <div>${error.message}</div>
+    `;
   }
 }
 
 // ========== AUTO REFRESH ==========
 function setupAutoRefresh() {
-  const refreshInterval = window.MSA_CONFIG?.ui?.refreshInterval || 300000; // 5 minutes
+  const refreshInterval = window.MSA_CONFIG?.ui?.refreshInterval || 300000;
   
   setInterval(() => {
     console.log('🔄 Auto-refreshing data...');
+    eventsLoadingPromise = null;
     loadAllData();
   }, refreshInterval);
 }
 
+// Handle viewport changes
+window.addEventListener('resize', () => {
+  const statusEl = document.getElementById('api-status');
+  if (statusEl) {
+    const currentText = statusEl.textContent;
+    const currentClass = statusEl.className;
+    const type = currentClass.split(' ').pop();
+    
+    if (currentText === '✅' || currentText.includes('Connected')) {
+      updateApiStatus('✅ Connected', type);
+    } else if (currentText === '❌' || currentText.includes('Error') || currentText.includes('Disconnected')) {
+      updateApiStatus('❌ Connection Error', type);
+    } else if (currentText === '🔐' || currentText.includes('Not logged in')) {
+      updateApiStatus('🔐 Not logged in', type);
+    }
+  }
+});

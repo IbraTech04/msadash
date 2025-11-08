@@ -63,7 +63,7 @@
         <p class="highlight">وَقُلِ ٱعْمَلُوا۟ فَسَيَرَى ٱللَّهُ عَمَلَكُمْ</p>
         <a href="https://quran.com/at-tawbah/105" target="_blank"><p class="citation">— At-Tawbah 9:105</p></a>
       </div>
-    <caption class="highlight">v2025.8.1</caption>
+      <div class="version-badge">v2026</div>
     </div>
 
 
@@ -85,6 +85,7 @@
         <button id="toggle-mode" class="mode-toggle">🌙</button>
         <div class="user-menu">
           <span class="user-greeting">السلام عليكم</span>
+          <button id="login-btn" class="login-btn" style="display: none;">🔐 Login with Discord</button>
         </div>
       </div>
     </header>
@@ -200,9 +201,9 @@
             <option value="">All Status</option>
             <option value="📥 In Queue">📥 In Queue</option>
             <option value="🔄 In Progress">🔄 In Progress</option>
-            <option value="⏳ Awaiting Approval">⏳ Awaiting Approval</option>
             <option value="⏳ Awaiting Posting">⏳ Awaiting Posting</option>
             <option value="✅ Done">✅ Done</option>
+            <option value="🚫 Blocked">🚫 Blocked</option>
           </select>
           <button class="action-btn" onclick="exportEvents()">📤 Export</button>
         </div>
@@ -246,9 +247,9 @@
           <div class="calendar-legend">
             <span class="legend-item status-inqueue">📥 In Queue</span>
             <span class="legend-item status-inprogress">🔄 In Progress</span>
-            <span class="legend-item status-awaitingapproval">⏳ Awaiting Approval</span>
             <span class="legend-item status-awaitingposting">⏳ Awaiting Posting</span>
             <span class="legend-item status-done">✅ Done</span>
+            <span class="legend-item status-blocked">🚫 Blocked</span>
           </div>
         </div>
       </div>
@@ -349,6 +350,7 @@
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
   <script src="env.js"></script>
   <script src="config.js"></script>
+  <script src="api-service.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

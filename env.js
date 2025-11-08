@@ -5,24 +5,24 @@
 window.MSA_ENV = {
   // API Configuration from environment variables
   // Set these values to override the default API configuration
-  API_URL: undefined, // e.g., "https://api.utmmsa.com"
-  API_KEY: undefined, // e.g., "your-production-key"
+  API_URL: undefined, // e.g., "https://api.utmmsa.com" or "http://localhost:8080"
+  API_KEY: undefined, // e.g., "your-bot-api-key" (only needed for bot operations)
   
   // Environment info
-  ENVIRONMENT: undefined, // 'development', 'staging', 'production'
-  VERSION: undefined,     // Application version
+  ENVIRONMENT: 'development', // 'development', 'staging', 'production'
+  VERSION: '2025.8.1',     // Application version
   BUILD_TIME: undefined,  // Build timestamp
   
   // Feature flags from environment
-  ENABLE_DEBUG: false,
+  ENABLE_DEBUG: true,
   ENABLE_ANALYTICS: false
 };
 
-// Example: To set a custom API URL, uncomment and modify this line:
-window.MSA_ENV.API_URL = "https://50c0ac0143b3.ngrok-free.app";
+// Example: To set a custom API URL (e.g., ngrok tunnel), uncomment and modify this line:
+// window.MSA_ENV.API_URL = "https://your-ngrok-url.ngrok-free.app";
 
-// Example: To set a custom API key, uncomment and modify this line:
-// window.MSA_ENV.API_KEY = "your-secret-key";
+// Example: To set the bot API key for bot-authenticated operations, uncomment and modify:
+// window.MSA_ENV.API_KEY = "your-secret-bot-api-key";
 
 // Development helper - logs configuration in development
 if (window.location.hostname === 'localhost') {
