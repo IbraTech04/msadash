@@ -84,7 +84,7 @@
         } else if (data.status === 'error' || path.includes('/api/auth/failure')) {
           // Authentication failed
           statusEl.textContent = '❌ Authentication failed';
-          messageEl.textContent = data.message || 'You may not be a member of the UTM MSA Discord server. Redirecting...';
+          messageEl.textContent = data.message || 'You may not be a member of the Marketing Command Centre. Redirecting...';
           messageEl.className = 'error';
           
           console.error('❌ Authentication failed:', data);

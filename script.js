@@ -101,7 +101,7 @@ function showLoginScreen() {
       <div class="login-content">
         <h2>السلام عليكم! 👋</h2>
         <p>Please sign in with your Discord account to access the Marketing Command Centre.</p>
-        <p class="login-requirement">✓ You must be a member of the UTM MSA Discord server</p>
+        <p class="login-requirement">✓ You must be a member of the Marketing Command Centre</p>
         
         <button class="login-button" onclick="initiateLogin()">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
