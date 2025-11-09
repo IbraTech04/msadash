@@ -154,14 +154,32 @@ body *::after {
   padding: 1rem 1.5rem;
   color: rgba(255,255,255,0.8);
   text-decoration: none;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border-left: 3px solid transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+.nav-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  background: linear-gradient(90deg, rgba(211, 175, 90, 0.2), transparent);
+  transition: width 0.3s ease;
+}
+
+.nav-item:hover::before {
+  width: 100%;
 }
 
 .nav-item:hover {
   background-color: rgba(255,255,255,0.1);
   color: var(--white);
   border-left-color: var(--accent-gold);
+  transform: translateX(4px);
 }
 
 .nav-item.active {
@@ -174,10 +192,20 @@ body *::after {
   font-size: 1.2rem;
   width: 2rem;
   margin-right: 0.75rem;
+  transition: transform 0.3s ease;
+}
+
+.nav-item:hover .nav-icon {
+  transform: scale(1.2) rotate(5deg);
 }
 
 .nav-text {
   font-weight: 500;
+  transition: letter-spacing 0.3s ease;
+}
+
+.nav-item:hover .nav-text {
+  letter-spacing: 0.5px;
 }
 
 .sidebar-footer {
@@ -320,11 +348,17 @@ body.night-mode .version-badge:hover {
   cursor: pointer;
   padding: 0.5rem;
   border-radius: var(--border-radius-sm);
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sidebar-toggle:hover {
   background-color: var(--light-gray);
+  transform: scale(1.1) rotate(90deg);
+  color: var(--accent-gold);
+}
+
+.sidebar-toggle:active {
+  transform: scale(0.95) rotate(90deg);
 }
 
 .header-left h1 {
@@ -419,10 +453,34 @@ body.night-mode .version-badge:hover {
   display: none;
   padding: 2rem;
   flex: 1;
+  animation: fadeOut 0.3s ease;
 }
 
 .content-section.active {
   display: block;
+  animation: fadeInSlide 0.4s ease;
+}
+
+@keyframes fadeInSlide {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
 }
 
 /* Full-width sections */
@@ -498,7 +556,7 @@ body.night-mode .version-badge:hover {
   padding: 1rem;
   background: var(--light-gray);
   border-radius: var(--border-radius-sm);
-  transition: background-color 0.3s ease, transform 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .stat-number {
@@ -506,7 +564,7 @@ body.night-mode .version-badge:hover {
   font-size: 2rem;
   font-weight: 700;
   color: var(--primary-blue);
-  transition: color 0.3s ease;
+  transition: all 0.3s ease;
 }
 
 .stat-label {
@@ -528,12 +586,26 @@ body.night-mode .version-badge:hover {
   background: var(--light-gray);
   margin-bottom: 0.5rem;
   border-radius: var(--border-radius-sm);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.recent-item:hover {
+  background: rgba(211, 175, 90, 0.08);
+  border-left-width: 4px;
+  padding-left: calc(0.75rem - 1px);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 .recent-title {
   font-weight: 600;
   color: var(--primary-blue);
   margin-bottom: 0.25rem;
+  transition: color 0.2s ease;
+}
+
+.recent-item:hover .recent-title {
+  color: var(--accent-gold);
 }
 
 .recent-meta {
@@ -587,7 +659,7 @@ body.night-mode .version-badge:hover {
   border-radius: var(--border-radius-sm);
   text-decoration: none;
   color: var(--primary-blue);
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .link-item:hover {
@@ -739,7 +811,19 @@ body.night-mode .version-badge:hover {
 .status-content {
   padding: 1.25rem;
   background: rgba(255, 255, 255, 0.3);
-  transition: all 0.3s ease;
+  max-height: 5000px;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+  transform: scaleY(1);
+  transform-origin: top;
+}
+
+.status-section.collapsed .status-content {
+  max-height: 0;
+  padding: 0 1.25rem;
+  opacity: 0;
+  transform: scaleY(0.95);
 }
 
 .status-section.collapsed {
@@ -874,6 +958,20 @@ body.night-mode .version-badge:hover {
   background: linear-gradient(135deg, rgba(220, 53, 69, 0.2), rgba(220, 53, 69, 0.1));
   color: #d32f2f;
   border: 2px solid rgba(220, 53, 69, 0.4);
+}
+
+.event-card-urgency.moderate {
+  background: linear-gradient(135deg, rgba(76, 142, 239, 0.15), rgba(76, 142, 239, 0.08));
+  color: #2563eb;
+  border: 2px solid rgba(76, 142, 239, 0.3);
+  animation: none;
+}
+
+.event-card-urgency.normal {
+  background: linear-gradient(135deg, rgba(211, 175, 90, 0.15), rgba(211, 175, 90, 0.08));
+  color: #8b7355;
+  border: 2px solid rgba(211, 175, 90, 0.3);
+  animation: none;
 }
 
 .event-card-title {
@@ -1320,6 +1418,20 @@ body.night-mode .version-badge:hover {
   align-items: center;
 }
 
+/* Legend chips for cycles */
+.cycle-dev-legend {
+  background: linear-gradient(135deg, rgba(76, 142, 239, 0.25), rgba(76, 142, 239, 0.35));
+  border: 2px solid rgba(76, 142, 239, 0.6);
+}
+.cycle-post-legend {
+  background: linear-gradient(135deg, rgba(40, 167, 69, 0.25), rgba(40, 167, 69, 0.35));
+  border: 2px solid rgba(40, 167, 69, 0.6);
+}
+.cycle-taskday-legend {
+  background: linear-gradient(135deg, rgba(211, 175, 90, 0.35), rgba(211, 175, 90, 0.45));
+  border: 2px solid rgba(211, 175, 90, 0.8);
+}
+
 /* FullCalendar Overrides */
 #main-calendar {
   font-family: inherit;
@@ -1450,6 +1562,83 @@ body.night-mode .version-badge:hover {
 .fc-event-title {
   font-weight: 600 !important;
   font-size: 0.85rem !important;
+}
+
+/* Calendar Cycle Overlays - Day Cell Styling */
+.fc-daygrid-day.day-in-dev-cycle {
+  background: linear-gradient(135deg, rgba(76, 142, 239, 0.08), rgba(76, 142, 239, 0.12)) !important;
+  border-left: 4px solid rgba(76, 142, 239, 0.5) !important;
+}
+
+.fc-daygrid-day.day-in-post-cycle {
+  background: linear-gradient(135deg, rgba(40, 167, 69, 0.08), rgba(40, 167, 69, 0.12)) !important;
+  border-right: 4px solid rgba(40, 167, 69, 0.5) !important;
+}
+
+/* More granular cycle phases */
+.fc-daygrid-day.day-in-prev-post-cycle {
+  background: linear-gradient(135deg, rgba(255, 152, 0, 0.10), rgba(255, 152, 0, 0.16)) !important; /* amber */
+  border-right: 4px solid rgba(255, 152, 0, 0.55) !important;
+}
+.fc-daygrid-day.day-in-next-post-cycle {
+  background: linear-gradient(135deg, rgba(40, 167, 69, 0.10), rgba(40, 167, 69, 0.18)) !important; /* brighter green */
+  border-right: 4px solid rgba(40, 167, 69, 0.65) !important;
+}
+
+/* When both dev and post overlap, show split border */
+.fc-daygrid-day.day-in-dev-cycle.day-in-post-cycle {
+  background: linear-gradient(to right, rgba(76, 142, 239, 0.1) 50%, rgba(40, 167, 69, 0.1) 50%) !important;
+  border-left: 4px solid rgba(76, 142, 239, 0.6) !important;
+  border-right: 4px solid rgba(40, 167, 69, 0.6) !important;
+}
+
+.fc-daygrid-day.day-task-assignment {
+  background: linear-gradient(135deg, rgba(211, 175, 90, 0.2), rgba(211, 175, 90, 0.3)) !important;
+  border: 3px solid rgba(211, 175, 90, 0.7) !important;
+  box-shadow: inset 0 0 15px rgba(211, 175, 90, 0.3) !important;
+  position: relative;
+}
+
+.fc-daygrid-day.day-task-assignment::before {
+  content: '📋';
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  font-size: 1.2rem;
+  opacity: 0.7;
+  z-index: 1;
+}
+
+/* Dark mode cycle overlays */
+body.dark-mode .fc-daygrid-day.day-in-dev-cycle {
+  background: linear-gradient(135deg, rgba(76, 142, 239, 0.05), rgba(76, 142, 239, 0.08)) !important;
+  border-left-color: rgba(76, 142, 239, 0.4) !important;
+}
+
+body.dark-mode .fc-daygrid-day.day-in-post-cycle {
+  background: linear-gradient(135deg, rgba(40, 167, 69, 0.05), rgba(40, 167, 69, 0.08)) !important;
+  border-right-color: rgba(40, 167, 69, 0.4) !important;
+}
+
+body.dark-mode .fc-daygrid-day.day-in-dev-cycle.day-in-post-cycle {
+  background: linear-gradient(to right, rgba(76, 142, 239, 0.07) 50%, rgba(40, 167, 69, 0.07) 50%) !important;
+  border-left-color: rgba(76, 142, 239, 0.5) !important;
+  border-right-color: rgba(40, 167, 69, 0.5) !important;
+}
+
+body.dark-mode .fc-daygrid-day.day-in-prev-post-cycle {
+  background: linear-gradient(135deg, rgba(255, 152, 0, 0.07), rgba(255, 152, 0, 0.12)) !important;
+  border-right-color: rgba(255, 152, 0, 0.45) !important;
+}
+body.dark-mode .fc-daygrid-day.day-in-next-post-cycle {
+  background: linear-gradient(135deg, rgba(40, 167, 69, 0.08), rgba(40, 167, 69, 0.14)) !important;
+  border-right-color: rgba(40, 167, 69, 0.55) !important;
+}
+
+body.dark-mode .fc-daygrid-day.day-task-assignment {
+  background: linear-gradient(135deg, rgba(211, 175, 90, 0.15), rgba(211, 175, 90, 0.25)) !important;
+  border-color: rgba(211, 175, 90, 0.6) !important;
+  box-shadow: inset 0 0 15px rgba(211, 175, 90, 0.2) !important;
 }
 
 /* Tooltip styling so it doesn't expand row height */
@@ -1688,12 +1877,21 @@ body.night-mode .version-badge:hover {
   background: var(--white);
   font-family: inherit;
   color: var(--primary-blue);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.filter-select:hover {
+  border-color: var(--accent-gold);
+  box-shadow: 0 2px 8px rgba(211, 175, 90, 0.2);
+  transform: translateY(-1px);
 }
 
 .filter-select:focus {
   outline: none;
   border-color: var(--primary-blue);
-  box-shadow: 0 0 0 2px rgba(0, 40, 85, 0.1);
+  box-shadow: 0 0 0 3px rgba(0, 40, 85, 0.15);
+  transform: translateY(-2px);
 }
 
 /* ========== MODALS ========== */
@@ -1703,11 +1901,36 @@ body.night-mode .version-badge:hover {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0,0,0,0.5);
+  background-color: rgba(0,0,0,0);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 10000;
+  animation: fadeInOverlay 0.3s ease forwards;
+  backdrop-filter: blur(0px);
+  transition: backdrop-filter 0.3s ease;
+}
+
+.modal-overlay.closing {
+  animation: fadeOutOverlay 0.3s ease forwards;
+}
+
+@keyframes fadeInOverlay {
+  to {
+    background-color: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+  }
+}
+
+@keyframes fadeOutOverlay {
+  from {
+    background-color: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+  }
+  to {
+    background-color: rgba(0,0,0,0);
+    backdrop-filter: blur(0px);
+  }
 }
 
 .modal {
@@ -1720,6 +1943,39 @@ body.night-mode .version-badge:hover {
   position: relative;
   margin: 1rem;
   box-shadow: var(--shadow-lg);
+  animation: modalBounceIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: center;
+}
+
+.modal-overlay.closing .modal,
+.modal-overlay.closing .modern-modal {
+  animation: modalSlideOut 0.3s cubic-bezier(0.55, 0.085, 0.68, 0.53) forwards;
+}
+
+@keyframes modalBounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) translateY(-50px);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes modalSlideOut {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.8) translateY(30px);
+  }
 }
 
 .modal-close {
@@ -2183,6 +2439,18 @@ body.night-mode .version-badge:hover {
   color: #aaa;
 }
 
+.night-mode .event-card-urgency.moderate {
+  background: linear-gradient(135deg, rgba(76, 142, 239, 0.25), rgba(76, 142, 239, 0.15));
+  color: #60a5fa;
+  border-color: rgba(76, 142, 239, 0.4);
+}
+
+.night-mode .event-card-urgency.normal {
+  background: linear-gradient(135deg, rgba(211, 175, 90, 0.25), rgba(211, 175, 90, 0.15));
+  color: var(--night-accent);
+  border-color: rgba(211, 175, 90, 0.4);
+}
+
 .night-mode .event-card-footer {
   border-top-color: rgba(255, 255, 255, 0.1);
 }
@@ -2493,8 +2761,10 @@ body.night-mode .version-badge:hover {
 
 /* ========== MISC NIGHT MODE ENHANCEMENTS ========== */
 .night-mode .kanban-card-department {
-  background-color: var(--night-info);
+  background: linear-gradient(135deg, var(--night-blue), #3a8eef);
   color: white;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .night-mode .test-results {
@@ -3236,14 +3506,7 @@ body.night-mode .version-badge:hover {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  opacity: 0;
-  transform: scale(0.9) translateY(20px);
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.modal-overlay.modal-active .modern-modal {
-  opacity: 1;
-  transform: scale(1) translateY(0);
+  animation: modalBounceIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .night-mode .modern-modal {

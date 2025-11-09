@@ -443,15 +443,28 @@ function createEventCard(event) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-  const isOverdue = daysUntilDue < 0;
-  const isUrgent = daysUntilDue <= 2 && daysUntilDue >= 0;
+  const isDone = !!(event.status && event.status.includes('Done'));
+  const isBlocked = !!(event.status && event.status.includes('Blocked'));
+  const isOverdue = daysUntilDue < 0 && !isDone && !isBlocked;
+  const isUrgent = daysUntilDue <= 2 && daysUntilDue >= 0 && !isDone && !isBlocked;
   
   const urgencyClass = isOverdue ? 'overdue' : isUrgent ? 'urgent' : '';
-  const urgencyText = isOverdue ? 
-    `⚠️ ${Math.abs(daysUntilDue)} days overdue` : 
-    isUrgent ? 
-      `🔥 ${daysUntilDue} days left` : 
-      `📅 ${daysUntilDue} days until due`;
+  
+  // Always show days remaining
+  let urgencyText, urgencyBadgeClass;
+  if (isOverdue) {
+    urgencyText = `⚠️ ${Math.abs(daysUntilDue)} days overdue`;
+    urgencyBadgeClass = 'overdue';
+  } else if (isUrgent) {
+    urgencyText = `🔥 ${daysUntilDue} ${daysUntilDue === 1 ? 'day' : 'days'} left`;
+    urgencyBadgeClass = 'urgent';
+  } else if (daysUntilDue <= 7) {
+    urgencyText = `⏰ ${daysUntilDue} ${daysUntilDue === 1 ? 'day' : 'days'} left`;
+    urgencyBadgeClass = 'moderate';
+  } else {
+    urgencyText = `📅 ${daysUntilDue} days left`;
+    urgencyBadgeClass = 'normal';
+  }
   
   const statusColor = api.getStatusColor(event.status);
   const discordLink = api.generateDiscordChannelLink(event.channelID);
@@ -466,7 +479,7 @@ function createEventCard(event) {
           ${event.status || 'No Status'}
         </span>
       </div>
-      ${urgencyClass ? `<div class="event-card-urgency ${urgencyClass}">${urgencyText}</div>` : ''}
+      <div class="event-card-urgency ${urgencyBadgeClass}">${urgencyText}</div>
     </div>
     
     <h3 class="event-card-title">${escapeHtml(event.title)}</h3>
@@ -546,9 +559,10 @@ function updateEventsSummary(events) {
     pending: events.filter(e => e.status && !e.status.includes('Done')).length,
     completed: events.filter(e => e.status && e.status.includes('Done')).length,
     overdue: events.filter(e => {
-      const dueDate = new Date(e.posting_date);
-      const isDone = e.status && e.status.includes('Done');
-      return dueDate < today && !isDone;
+      const dueDate = new Date(e.posting_date + 'T00:00:00');
+      const isDone = !!(e.status && e.status.includes('Done'));
+      const isBlocked = !!(e.status && e.status.includes('Blocked'));
+      return dueDate < today && !isDone && !isBlocked;
     }).length
   };
   
@@ -588,9 +602,10 @@ async function loadDashboardStats() {
     pending: events.filter(e => e.status && !e.status.includes('Done')).length,
     completed: events.filter(e => e.status && e.status.includes('Done')).length,
     overdue: events.filter(e => {
-      const dueDate = new Date(e.posting_date);
-      const isDone = e.status && e.status.includes('Done');
-      return dueDate < today && !isDone;
+      const dueDate = new Date(e.posting_date + 'T00:00:00');
+      const isDone = !!(e.status && e.status.includes('Done'));
+      const isBlocked = !!(e.status && e.status.includes('Blocked'));
+      return dueDate < today && !isDone && !isBlocked;
     }).length
   };
   
@@ -641,8 +656,10 @@ async function loadMiniCalendar() {
     const today = new Date();
     const monthName = today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     const upcomingCount = currentEvents.filter(e => {
-      const dueDate = new Date(e.posting_date);
-      return dueDate >= today && !e.status?.includes('Done');
+      const dueDate = new Date(e.posting_date + 'T00:00:00');
+      const isDone = !!(e.status && e.status.includes('Done'));
+      const isBlocked = !!(e.status && e.status.includes('Blocked'));
+      return dueDate >= today && !isDone && !isBlocked;
     }).length;
     
     container.innerHTML = `
@@ -655,6 +672,95 @@ async function loadMiniCalendar() {
       </div>
     `;
   }
+}
+
+// ========== CALENDAR CYCLE HELPERS ==========
+// Parse a YYYY-MM-DD as a local date (avoid UTC timezone shifts)
+function parseLocalDate(dateString) {
+  return new Date(dateString + 'T00:00:00');
+}
+
+function formatLocalYMD(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function addDaysLocal(dateString, days) {
+  const date = parseLocalDate(dateString);
+  date.setDate(date.getDate() + days);
+  return formatLocalYMD(date);
+}
+
+function createCycleBackgroundEvents(cycleData) {
+  const events = [];
+  
+  // Current development cycle highlight
+  if (cycleData.currentDevelopmentCycle) {
+    const dev = cycleData.currentDevelopmentCycle;
+    events.push({
+      id: `dev-cycle-${dev.cycleNumber}`,
+      title: '', // avoid repeated labels on each day cell
+      start: dev.developmentStart,
+      end: addDaysLocal(dev.developmentEnd, 1), // FullCalendar end is exclusive
+      display: 'background',
+      classNames: ['cycle-dev'],
+      extendedProps: {
+        cycleType: 'development',
+        cycleNumber: dev.cycleNumber,
+        phase: 'current'
+      }
+    });
+
+    // Task assignment marker (last day of dev)
+    events.push({
+      id: `task-day-dev-${dev.cycleNumber}`,
+      title: '', // purely visual via cell class
+      start: dev.developmentEnd,
+      end: addDaysLocal(dev.developmentEnd, 1),
+      display: 'background',
+      classNames: ['task-assignment-day'],
+      extendedProps: { isTaskDay: true }
+    });
+
+    // Predict next posting window from current dev cycle (day after dev end for 14 days)
+    try {
+      const nextPostStart = addDaysLocal(dev.developmentEnd, 1);
+      const nextPostEnd = addDaysLocal(nextPostStart, 13); // 14-day window inclusive
+      events.push({
+        id: `post-cycle-next-${dev.cycleNumber}`,
+        title: '',
+        start: nextPostStart,
+        end: addDaysLocal(nextPostEnd, 1),
+        display: 'background',
+        classNames: ['cycle-post'],
+        extendedProps: { cycleType: 'posting', cycleNumber: dev.cycleNumber, predicted: true, phase: 'next' }
+      });
+    } catch (e) {
+      console.warn('Could not compute next posting window:', e);
+    }
+  }
+
+  // Current posting cycle highlight
+  if (cycleData.currentPostingCycle) {
+    const post = cycleData.currentPostingCycle;
+    events.push({
+      id: `post-cycle-${post.cycleNumber}`,
+      title: '',
+      start: post.postingStart,
+      end: addDaysLocal(post.postingEnd, 1), // inclusive range
+      display: 'background',
+      classNames: ['cycle-post'],
+      extendedProps: {
+        cycleType: 'posting',
+        cycleNumber: post.cycleNumber,
+        phase: 'previous'
+      }
+    });
+  }
+  
+  return events;
 }
 
 async function loadMainCalendar() {
@@ -683,15 +789,28 @@ async function loadMainCalendar() {
     
     const events = currentEvents.length > 0 ? currentEvents : await loadEvents();
     
+    // Fetch cycle information
+    let cycleEvents = [];
+    try {
+      const cycleResponse = await api.request('/api/workload/cycle-info', 'GET');
+      console.log('📊 Cycle data received:', cycleResponse);
+      cycleEvents = createCycleBackgroundEvents(cycleResponse);
+      console.log('🎨 Created cycle events:', cycleEvents);
+    } catch (error) {
+      console.error('❌ Could not load cycle info:', error);
+    }
+    
     console.log(`📅 Creating calendar with ${events.length} events`);
     
     const calendarEvents = events.map(event => {
       const dueDate = new Date(event.posting_date);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const isOverdue = dueDate < today;
-      const daysUntil = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-      const isUrgent = daysUntil <= 2 && daysUntil >= 0;
+  const isDone = !!(event.status && event.status.includes('Done'));
+  const isBlocked = !!(event.status && event.status.includes('Blocked'));
+  const isOverdue = dueDate < today && !isDone && !isBlocked;
+  const daysUntil = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+  const isUrgent = daysUntil <= 2 && daysUntil >= 0 && !isDone && !isBlocked;
       
       return {
         id: `event-${event.channelID}`,
@@ -715,20 +834,62 @@ async function loadMainCalendar() {
       };
     });
     
+    // We inject cycle events as background events but hide their (empty) elements to rely on cell classes only.
     currentCalendar = new FullCalendar.Calendar(calendarEl, {
       initialView: "dayGridMonth",
       height: "auto",
-      events: calendarEvents,
+      events: [...cycleEvents, ...calendarEvents],
       headerToolbar: {
         left: 'prev,next today',
         center: 'title',
         right: 'dayGridMonth,timeGridWeek,listWeek'
       },
       eventClick: function(info) {
-        showEventModal(info.event.extendedProps.originalEvent);
+        // Only open modal for regular events, not cycle backgrounds
+        if (info.event.extendedProps.originalEvent) {
+          showEventModal(info.event.extendedProps.originalEvent);
+        }
       },
       eventDidMount: function(info) {
         info.el.setAttribute('title', info.event.title);
+        
+        // Add special styling for background cycle events
+        if (info.event.display === 'background') {
+          info.el.style.pointerEvents = 'none';
+          // Hide the translucent block to let per-day cell gradients handle visuals
+          info.el.style.opacity = '0';
+          info.el.style.visibility = 'hidden';
+        }
+      },
+      dayCellDidMount: function(info) {
+        // Apply cycle styling to individual day cells
+        const currentDate = new Date(info.date);
+        currentDate.setHours(0, 0, 0, 0);
+        
+        cycleEvents.forEach(cycleEvent => {
+          const start = parseLocalDate(cycleEvent.start);
+          start.setHours(0, 0, 0, 0);
+          const end = parseLocalDate(cycleEvent.end);
+          end.setHours(0, 0, 0, 0);
+          
+          // Check if current date is within the cycle range (inclusive start, exclusive end)
+          if (currentDate >= start && currentDate < end) {
+            if (cycleEvent.extendedProps && cycleEvent.extendedProps.isTaskDay) {
+              info.el.classList.add('day-task-assignment');
+            } else if (cycleEvent.classNames.includes('cycle-dev')) {
+              info.el.classList.add('day-in-dev-cycle', 'day-in-current-dev-cycle');
+            } else if (cycleEvent.classNames.includes('cycle-post')) {
+              const phase = cycleEvent.extendedProps && cycleEvent.extendedProps.phase;
+              if (phase === 'previous') {
+                info.el.classList.add('day-in-prev-post-cycle');
+              } else if (phase === 'next') {
+                info.el.classList.add('day-in-next-post-cycle');
+              } else {
+                info.el.classList.add('day-in-post-cycle');
+              }
+            }
+          }
+        });
       }
     });
     
@@ -803,8 +964,10 @@ function createKanbanCard(event) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-  const isOverdue = daysUntilDue < 0;
-  const isUrgent = daysUntilDue <= 2 && daysUntilDue >= 0;
+  const isDone = !!(event.status && event.status.includes('Done'));
+  const isBlocked = !!(event.status && event.status.includes('Blocked'));
+  const isOverdue = daysUntilDue < 0 && !isDone && !isBlocked;
+  const isUrgent = daysUntilDue <= 2 && daysUntilDue >= 0 && !isDone && !isBlocked;
   
   const dueDateClass = isOverdue ? 'overdue' : isUrgent ? 'urgent' : '';
   const dueDateText = isOverdue ? 
@@ -839,8 +1002,10 @@ function showEventModal(event) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
-  const isOverdue = daysUntilDue < 0;
-  const isUrgent = daysUntilDue <= 2 && daysUntilDue >= 0;
+  const isDone = !!(event.status && event.status.includes('Done'));
+  const isBlocked = !!(event.status && event.status.includes('Blocked'));
+  const isOverdue = daysUntilDue < 0 && !isDone && !isBlocked;
+  const isUrgent = daysUntilDue <= 2 && daysUntilDue >= 0 && !isDone && !isBlocked;
   
   const urgencyClass = isOverdue ? 'overdue' : isUrgent ? 'urgent' : '';
   const urgencyText = isOverdue ? 
@@ -986,8 +1151,8 @@ function showEventModal(event) {
   });
   
   const close = () => {
-    modal.classList.remove('modal-active');
-    setTimeout(() => modal.remove(), 300);
+    modal.classList.add('closing');
+    setTimeout(() => modal.remove(), 350);
   };
   
   modal.querySelector('.modal-close').onclick = close;
