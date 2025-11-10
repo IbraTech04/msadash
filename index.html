@@ -40,6 +40,10 @@
         <span class="nav-icon">📋</span>
         <span class="nav-text">Events & Requests</span>
       </a>
+      <a href="#spreadsheet" class="nav-item" data-section="spreadsheet">
+        <span class="nav-icon">🧾</span>
+        <span class="nav-text">Spreadsheet View</span>
+      </a>
       <a href="#kanban" class="nav-item" data-section="kanban">
         <span class="nav-icon">🗂️</span>
         <span class="nav-text">Kanban Board</span>
@@ -174,29 +178,112 @@
       </div>
     </section>
 
-    <!-- Events Section -->
+    <!-- Events / Requests Section -->
     <section id="events" class="content-section">
       <div class="section-header">
-        <h2>📋 Marketing Events & Requests</h2>
+        <h2>📋 Marketing Requests Workspace</h2>
         <div class="section-actions">
-          <select id="status-filter" class="filter-select">
-            <option value="">All Status</option>
-            <option value="📥 In Queue">📥 In Queue</option>
-            <option value="🔄 In Progress">🔄 In Progress</option>
-            <option value="⏳ Awaiting Posting">⏳ Awaiting Posting</option>
-            <option value="✅ Done">✅ Done</option>
-            <option value="🚫 Blocked">🚫 Blocked</option>
-          </select>
-          <button class="action-btn" onclick="exportEvents()">📤 Export</button>
+          <button id="compact-mode-toggle" class="action-btn compact-toggle" title="Toggle compact view (Ctrl+K)">
+            <span>📐</span> Compact Mode
+          </button>
         </div>
       </div>
-      
-      <div class="events-summary" id="events-summary">
-        <!-- Summary will be populated by JS -->
+      <div class="requests-layout">
+        <!-- Sidebar / Controls -->
+        <aside class="requests-sidebar">
+          <div class="filter-panel">
+            <h3 class="panel-title">Filters</h3>
+            <div class="filter-group">
+              <label for="request-search">Search</label>
+              <input type="text" id="request-search" class="filter-input" placeholder="Search title, description, requester..." />
+            </div>
+            <div class="filter-row">
+              <div class="filter-group">
+                <label for="status-filter">Status</label>
+                <select id="status-filter" class="filter-select wide">
+                  <option value="">All</option>
+                  <option value="📥 In Queue">📥 In Queue</option>
+                  <option value="🔄 In Progress">🔄 In Progress</option>
+                  <option value="⏳ Awaiting Posting">⏳ Awaiting Posting</option>
+                  <option value="✅ Done">✅ Done</option>
+                  <option value="🚫 Blocked">🚫 Blocked</option>
+                </select>
+              </div>
+              <div class="filter-group">
+                <label for="type-filter">Type</label>
+                <select id="type-filter" class="filter-select wide">
+                  <option value="">All</option>
+                  <option value="poster">Poster</option>
+                  <option value="social">Social</option>
+                  <option value="video">Video</option>
+                  <option value="copy">Copy</option>
+                </select>
+              </div>
+            </div>
+            <div class="filter-group">
+              <label for="dept-filter">Department</label>
+              <select id="dept-filter" class="filter-select">
+                <option value="">All</option>
+                <option value="Events">Events</option>
+                <option value="Marketing">Marketing</option>
+                <option value="Social Media">Social Media</option>
+                <option value="Design">Design</option>
+              </select>
+            </div>
+            <div class="filter-actions">
+              <button class="filter-btn primary" onclick="applyAllFilters()">Apply</button>
+              <button class="filter-btn" onclick="resetRequestFilters()">Reset</button>
+            </div>
+          </div>
+          <div class="summary-panel" id="events-summary">
+            <!-- Summary populated by JS -->
+          </div>
+          <div class="utility-panel">
+            <button class="utility-btn" onclick="refreshData()">🔄 Refresh Data</button>
+            <button class="utility-btn" onclick="exportEvents()">📤 Export CSV</button>
+          </div>
+        </aside>
+        <!-- Main Content -->
+        <div class="requests-main">
+          <div class="requests-toolbar">
+            <div class="toolbar-left">
+              <div class="active-filters" id="active-filters"></div>
+            </div>
+            <div class="toolbar-right">
+              <span id="filtered-count" class="filtered-count">0 shown</span>
+            </div>
+          </div>
+          <div class="status-grid" id="task-container">
+            <div class="loading">🔄 Loading requests...</div>
+          </div>
+        </div>
       </div>
-      
-      <div class="events-container" id="task-container">
-        <div class="loading">🔄 Loading events from API...</div>
+    </section>
+
+    <!-- Spreadsheet View Section -->
+    <section id="spreadsheet" class="content-section">
+      <div class="section-header">
+        <h2>🧾 Spreadsheet View</h2>
+        <div class="section-actions">
+          <select id="spreadsheet-type-filter" class="filter-select">
+            <option value="">All Types</option>
+            <option value="reel">Reels</option>
+            <option value="post">Posts</option>
+            <option value="poster">Posters</option>
+            <option value="video">Videos</option>
+            <option value="copy">Copy</option>
+          </select>
+          <button class="action-btn" onclick="exportSpreadsheetCsv()">📤 Export</button>
+        </div>
+      </div>
+      <div class="spreadsheet-container">
+        <div class="spreadsheet-controls">
+          <input id="spreadsheet-search" type="text" class="filter-input" placeholder="Search all columns" />
+          <button class="filter-btn primary" onclick="refreshSpreadsheet()">🔄 Refresh</button>
+        </div>
+        <div id="spreadsheet-table-wrapper" class="table-wrapper">
+          <div class="loading">Loading requests...</div>
+        </div>
       </div>
     </section>
 

@@ -190,10 +190,29 @@ function showUserMenu(user) {
 
 // ========== INITIALIZATION ==========
 function initializeDashboard() {
-  // Setup sidebar toggle for mobile
+  // Setup sidebar toggle
   const sidebarToggle = document.querySelector('.sidebar-toggle');
   if (sidebarToggle) {
     sidebarToggle.addEventListener('click', toggleSidebar);
+    sidebarToggle.title = 'Collapse sidebar';
+  }
+  
+  // Restore sidebar state from localStorage (desktop only)
+  if (window.innerWidth > 768) {
+    try {
+      const sidebarCollapsed = localStorage.getItem('sidebar_collapsed') === 'true';
+      if (sidebarCollapsed) {
+        const sidebar = document.querySelector('.sidebar');
+        const mainContent = document.querySelector('.main-content');
+        sidebar.classList.add('collapsed');
+        mainContent.classList.add('sidebar-collapsed');
+        if (sidebarToggle) {
+          sidebarToggle.title = 'Expand sidebar';
+        }
+      }
+    } catch (e) {
+      console.warn('Could not restore sidebar state:', e);
+    }
   }
   
   // Initialize charts placeholder
@@ -201,6 +220,104 @@ function initializeDashboard() {
   
   // Setup event filters
   setupEventFilters();
+  
+  // Setup compact mode toggle
+  setupCompactMode();
+}
+
+// ========== COMPACT MODE ==========
+function setupCompactMode() {
+  const compactToggle = document.getElementById('compact-mode-toggle');
+  if (!compactToggle) return;
+  
+  // Restore compact mode state from localStorage
+  try {
+    const isCompact = localStorage.getItem('events_compact_mode') === 'true';
+    if (isCompact) {
+      activateCompactMode();
+    }
+  } catch (e) {
+    console.warn('Could not restore compact mode state:', e);
+  }
+  
+  // Add click handler
+  compactToggle.addEventListener('click', toggleCompactMode);
+  
+  // Add keyboard shortcut (Ctrl/Cmd + K)
+  document.addEventListener('keydown', (e) => {
+    // Check if we're in the events section
+    const eventsSection = document.getElementById('events');
+    if (!eventsSection || !eventsSection.classList.contains('active')) return;
+    
+    // Check for Ctrl+K or Cmd+K
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      toggleCompactMode();
+    }
+  });
+}
+
+function toggleCompactMode() {
+  const container = document.getElementById('task-container');
+  const toggle = document.getElementById('compact-mode-toggle');
+  
+  if (!container || !toggle) return;
+  
+  const isCurrentlyCompact = container.classList.contains('compact-mode');
+  
+  if (isCurrentlyCompact) {
+    deactivateCompactMode();
+  } else {
+    activateCompactMode();
+  }
+}
+
+function activateCompactMode() {
+  const container = document.getElementById('task-container');
+  const toggle = document.getElementById('compact-mode-toggle');
+  
+  if (container) {
+    container.classList.add('compact-mode');
+  }
+  
+  if (toggle) {
+    toggle.classList.add('active');
+    toggle.innerHTML = '<span>📐</span> Compact: ON';
+  }
+  
+  // Save preference
+  try {
+    localStorage.setItem('events_compact_mode', 'true');
+  } catch (e) {
+    console.warn('Could not save compact mode state:', e);
+  }
+  
+  // Show brief notification
+  showToast('Compact mode enabled', 'success');
+}
+
+function deactivateCompactMode() {
+  const container = document.getElementById('task-container');
+  const toggle = document.getElementById('compact-mode-toggle');
+  
+  if (container) {
+    container.classList.remove('compact-mode');
+  }
+  
+  if (toggle) {
+    toggle.classList.remove('active');
+    toggle.innerHTML = '<span>📐</span> Compact Mode';
+  }
+  
+  // Save preference
+  try {
+    localStorage.setItem('events_compact_mode', 'false');
+  } catch (e) {
+    console.warn('Could not save compact mode state:', e);
+  }
+  
+  // Show brief notification
+  showToast('Compact mode disabled', 'success');
 }
 
 // ========== NAVIGATION ==========
@@ -230,6 +347,9 @@ function openSection(sectionId) {
     case 'calendar':
       loadMainCalendar();
       break;
+    case 'spreadsheet':
+      loadSpreadsheetView();
+      break;
     case 'kanban':
       loadKanbanBoard();
       break;
@@ -245,7 +365,34 @@ function openSection(sectionId) {
 }
 
 function toggleSidebar() {
-  document.querySelector('.sidebar').classList.toggle('open');
+  const sidebar = document.querySelector('.sidebar');
+  const mainContent = document.querySelector('.main-content');
+  const toggleBtn = document.querySelector('.sidebar-toggle');
+  
+  // For mobile: toggle open/close
+  if (window.innerWidth <= 768) {
+    sidebar.classList.toggle('open');
+  } else {
+    // For desktop: toggle collapse
+    sidebar.classList.toggle('collapsed');
+    mainContent.classList.toggle('sidebar-collapsed');
+    
+    // Update toggle button icon
+    if (sidebar.classList.contains('collapsed')) {
+      toggleBtn.textContent = '☰';
+      toggleBtn.title = 'Expand sidebar';
+    } else {
+      toggleBtn.textContent = '☰';
+      toggleBtn.title = 'Collapse sidebar';
+    }
+    
+    // Save preference
+    try {
+      localStorage.setItem('sidebar_collapsed', sidebar.classList.contains('collapsed'));
+    } catch (e) {
+      console.warn('Could not save sidebar state:', e);
+    }
+  }
 }
 
 // ========== MODE TOGGLE ==========
@@ -309,6 +456,8 @@ async function loadAllData() {
   console.log('🔄 Loading all dashboard data...');
   try {
     await loadEvents();
+    // Populate dynamic filters based on the freshly loaded dataset
+    populateAllDynamicFilters(currentEvents);
     await Promise.all([
       loadDashboardStats(),
       loadRecentActivity(),
@@ -1313,22 +1462,168 @@ function updateChartsForDayMode() {
 // ========== EVENT FILTERS ==========
 function setupEventFilters() {
   const statusFilter = document.getElementById('status-filter');
-  if (statusFilter) {
-    statusFilter.addEventListener('change', filterEvents);
+  const typeFilter = document.getElementById('type-filter');
+  const deptFilter = document.getElementById('dept-filter');
+  const searchInput = document.getElementById('request-search');
+
+  if (statusFilter) statusFilter.addEventListener('change', autoFilter);
+  if (typeFilter) typeFilter.addEventListener('change', autoFilter);
+  if (deptFilter) deptFilter.addEventListener('change', autoFilter);
+  if (searchInput) {
+    searchInput.addEventListener('input', debounce(autoFilter, 250));
   }
 }
 
-function filterEvents() {
-  const statusFilter = document.getElementById('status-filter');
-  const selectedStatus = statusFilter?.value || '';
-  
-  let filteredEvents = currentEvents;
-  if (selectedStatus) {
-    filteredEvents = currentEvents.filter(event => event.status === selectedStatus);
+// Build dynamic filter dropdowns from dataset
+function populateAllDynamicFilters(events) {
+  try {
+    populateRequestFilters(events);
+    populateSpreadsheetTypeFilter(events);
+  } catch (e) {
+    console.warn('Dynamic filters population failed:', e);
   }
-  
-  displayEvents(filteredEvents);
-  updateEventsSummary(filteredEvents);
+}
+
+function uniqueSorted(arr) {
+  return Array.from(new Set(arr.filter(Boolean))).sort((a,b)=>String(a).localeCompare(String(b)));
+}
+
+function populateRequestFilters(events) {
+  const byStatus = new Map();
+  const byType = new Map();
+  const byDept = new Map();
+
+  events.forEach(e => {
+    const st = e.status || 'Unknown';
+    byStatus.set(st, (byStatus.get(st)||0)+1);
+    const tp = e.request_type || 'Unknown';
+    byType.set(tp, (byType.get(tp)||0)+1);
+    const dept = e.department || e.requester_department_name || 'Unknown';
+    byDept.set(dept, (byDept.get(dept)||0)+1);
+  });
+
+  // Status order preference
+  const statusOrder = ['📥 In Queue','🔄 In Progress','⏳ Awaiting Posting','🚫 Blocked','✅ Done'];
+  const statuses = statusOrder.filter(s => byStatus.has(s)).concat(
+    uniqueSorted(Array.from(byStatus.keys()).filter(s => !statusOrder.includes(s)))
+  );
+
+  rebuildSelect('status-filter', statuses.map(s => ({value:s, label:`${s} (${byStatus.get(s)})`})));
+
+  const types = uniqueSorted(Array.from(byType.keys()));
+  rebuildSelect('type-filter', types.map(t => ({
+    value: t,
+    label: `${api ? api.formatRequestType(t) : t} (${byType.get(t)})`
+  })));
+
+  const depts = uniqueSorted(Array.from(byDept.keys()));
+  rebuildSelect('dept-filter', depts.map(d => ({value:d, label:`${d} (${byDept.get(d)})`})));
+}
+
+function rebuildSelect(id, options) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const current = el.value;
+  // Clear
+  while (el.firstChild) el.removeChild(el.firstChild);
+  const optAll = document.createElement('option');
+  optAll.value = '';
+  optAll.textContent = 'All';
+  el.appendChild(optAll);
+  options.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o.value;
+    opt.textContent = o.label;
+    el.appendChild(opt);
+  });
+  if (current && options.some(o => String(o.value) === String(current))) {
+    el.value = current;
+  } else {
+    el.value = '';
+  }
+}
+
+function populateSpreadsheetTypeFilter(events) {
+  const el = document.getElementById('spreadsheet-type-filter');
+  if (!el) return;
+  const current = el.value;
+  const counts = new Map();
+  events.forEach(e => counts.set(e.request_type || 'Unknown', (counts.get(e.request_type || 'Unknown')||0)+1));
+  const types = uniqueSorted(Array.from(counts.keys()));
+  while (el.firstChild) el.removeChild(el.firstChild);
+  const optAll = document.createElement('option');
+  optAll.value = '';
+  optAll.textContent = 'All Types';
+  el.appendChild(optAll);
+  types.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t;
+    opt.textContent = `${api ? api.formatRequestType(t) : t} (${counts.get(t)})`;
+    el.appendChild(opt);
+  });
+  el.value = current && types.includes(current) ? current : '';
+}
+
+function applyAllFilters() { autoFilter(); }
+function resetRequestFilters() {
+  ['status-filter','type-filter','dept-filter','request-search'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
+  });
+  autoFilter();
+}
+
+function autoFilter() {
+  const statusVal = document.getElementById('status-filter')?.value || '';
+  const typeVal = document.getElementById('type-filter')?.value || '';
+  const deptVal = document.getElementById('dept-filter')?.value || '';
+  const searchVal = (document.getElementById('request-search')?.value || '').toLowerCase().trim();
+
+  let filtered = currentEvents.slice();
+
+  if (statusVal) filtered = filtered.filter(e => e.status === statusVal);
+  if (typeVal) filtered = filtered.filter(e => (e.request_type || '').toLowerCase().includes(typeVal.toLowerCase()));
+  if (deptVal) filtered = filtered.filter(e => {
+    const dept = (e.department || e.requester_department_name || '').toLowerCase();
+    return dept.includes(deptVal.toLowerCase());
+  });
+  if (searchVal) {
+    filtered = filtered.filter(e => {
+      return [e.title, e.description, e.requester_name, e.assigned_to_name]
+        .filter(Boolean)
+        .some(field => field.toLowerCase().includes(searchVal));
+    });
+  }
+
+  // Update active filter chips
+  const chipsContainer = document.getElementById('active-filters');
+  if (chipsContainer) {
+    chipsContainer.innerHTML = '';
+    const pushChip = (label, value, clearFn) => {
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.innerHTML = `<span>${label}: ${escapeHtml(value)}</span><button aria-label="Remove filter">✕</button>`;
+      chip.querySelector('button').onclick = clearFn;
+      chipsContainer.appendChild(chip);
+    };
+    if (statusVal) pushChip('Status', statusVal, () => { document.getElementById('status-filter').selectedIndex = 0; autoFilter(); });
+    if (typeVal) pushChip('Type', typeVal, () => { document.getElementById('type-filter').selectedIndex = 0; autoFilter(); });
+    if (deptVal) pushChip('Dept', deptVal, () => { document.getElementById('dept-filter').selectedIndex = 0; autoFilter(); });
+    if (searchVal) pushChip('Search', searchVal, () => { document.getElementById('request-search').value=''; autoFilter(); });
+  }
+
+  // Update count badge
+  const countEl = document.getElementById('filtered-count');
+  if (countEl) countEl.textContent = `${filtered.length} shown`;
+
+  // Re-render sections with filtered events
+  displayEvents(filtered);
+  updateEventsSummary(filtered);
+}
+
+function debounce(fn, wait) {
+  let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn.apply(this,args), wait); };
 }
 
 // ========== UTILITY FUNCTIONS ==========
@@ -1388,6 +1683,142 @@ function exportEvents() {
   downloadCSV(csv, 'msa-marketing-requests.csv');
   showToast('Requests exported successfully!');
 }
+
+// ========== SPREADSHEET VIEW ==========
+function loadSpreadsheetView() {
+  if (!currentEvents || !currentEvents.length) {
+    loadEvents().then(renderSpreadsheetTable);
+  } else {
+    renderSpreadsheetTable();
+  }
+  setupSpreadsheetFilters();
+}
+
+function setupSpreadsheetFilters() {
+  const typeFilter = document.getElementById('spreadsheet-type-filter');
+  const searchInput = document.getElementById('spreadsheet-search');
+  if (typeFilter && !typeFilter.dataset.bound) {
+    typeFilter.addEventListener('change', renderSpreadsheetTable);
+    typeFilter.dataset.bound = 'true';
+  }
+  if (searchInput && !searchInput.dataset.bound) {
+    searchInput.addEventListener('input', debounce(renderSpreadsheetTable, 250));
+    searchInput.dataset.bound = 'true';
+  }
+}
+
+function normalizeStatusKey(status) {
+  if (!status) return 'unknown';
+  const s = status.toLowerCase();
+  if (s.includes('queue')) return 'queue';
+  if (s.includes('progress')) return 'inprogress';
+  if (s.includes('awaiting')) return 'awaiting';
+  if (s.includes('done')) return 'done';
+  if (s.includes('blocked')) return 'blocked';
+  return s.replace(/\s+/g,'-');
+}
+
+function renderSpreadsheetTable() {
+  const wrapper = document.getElementById('spreadsheet-table-wrapper');
+  if (!wrapper) return;
+
+  const typeFilterVal = document.getElementById('spreadsheet-type-filter')?.value || '';
+  const searchVal = (document.getElementById('spreadsheet-search')?.value || '').toLowerCase().trim();
+
+  let data = currentEvents.slice();
+  if (typeFilterVal) {
+    data = data.filter(e => (e.request_type || '').toLowerCase().includes(typeFilterVal.toLowerCase()));
+  }
+  if (searchVal) {
+    data = data.filter(e => [e.title,e.description,e.requester_name,e.assigned_to_name,e.status,e.request_type]
+      .filter(Boolean)
+      .some(v => v.toLowerCase().includes(searchVal)));
+  }
+
+  // Sort chronologically by posting date ASC
+  data.sort((a,b) => new Date(a.posting_date) - new Date(b.posting_date));
+
+  // Group by status with Done at bottom
+  const groupsOrder = ['📥 In Queue','🔄 In Progress','⏳ Awaiting Posting','🚫 Blocked','✅ Done'];
+  const groups = {};
+  data.forEach(ev => {
+    const st = ev.status || 'Unknown';
+    groups[st] = groups[st] || [];
+    groups[st].push(ev);
+  });
+
+  const orderedStatuses = groupsOrder.filter(s => groups[s])
+    .concat(Object.keys(groups).filter(s => !groupsOrder.includes(s) && !s.includes('Done')))
+    .concat(groups['✅ Done'] ? ['✅ Done'] : []);
+
+  const header = `
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Due Date</th>
+          <th>Status</th>
+          <th>Title</th>
+          <th>Type</th>
+          <th>Requester</th>
+          <th>Assigned To</th>
+          <th>Department</th>
+          <th>Channel ID</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+  let body = '';
+  orderedStatuses.forEach(statusLabel => {
+    const rows = groups[statusLabel];
+    if (!rows) return;
+    body += `<tr class="status-group-row"><td colspan="8">${escapeHtml(statusLabel)} (${rows.length})</td></tr>`;
+    rows.forEach(ev => {
+      const dueDate = new Date(ev.posting_date + 'T00:00:00');
+      const statusKey = normalizeStatusKey(ev.status);
+      const isDone = statusKey === 'done';
+      const isBlocked = statusKey === 'blocked';
+      body += `<tr>
+        <td>${dueDate.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td>
+        <td><span class="pill status ${statusKey}">${escapeHtml(ev.status || 'Unknown')}</span></td>
+        <td>${escapeHtml(ev.title)}</td>
+        <td><span class="pill type">${escapeHtml(api.formatRequestType(ev.request_type) || 'N/A')}</span></td>
+        <td>${escapeHtml(ev.requester_name || '—')}</td>
+        <td>${escapeHtml(ev.assigned_to_name || (isDone?'Completed':'Unassigned'))}</td>
+        <td>${escapeHtml(ev.department || ev.requester_department_name || '—')}</td>
+        <td class="text-muted">${ev.channelID}</td>
+      </tr>`;
+    });
+  });
+
+  const footer = '</tbody></table>';
+  wrapper.innerHTML = header + body + footer;
+}
+
+function exportSpreadsheetCsv() {
+  // Reuse current filtered table data
+  const typeFilterVal = document.getElementById('spreadsheet-type-filter')?.value || '';
+  const searchVal = (document.getElementById('spreadsheet-search')?.value || '').toLowerCase().trim();
+  let data = currentEvents.slice();
+  if (typeFilterVal) data = data.filter(e => (e.request_type || '').toLowerCase().includes(typeFilterVal.toLowerCase()));
+  if (searchVal) data = data.filter(e => [e.title,e.description,e.requester_name,e.assigned_to_name,e.status,e.request_type]
+    .filter(Boolean).some(v => v.toLowerCase().includes(searchVal)));
+  data.sort((a,b) => new Date(a.posting_date) - new Date(b.posting_date));
+  const rows = data.map(ev => [
+    ev.posting_date,
+    ev.status,
+    ev.title,
+    ev.request_type,
+    ev.requester_name,
+    ev.assigned_to_name,
+    ev.department || ev.requester_department_name || '',
+    ev.channelID
+  ]);
+  const header = ['Due Date','Status','Title','Type','Requester','Assigned To','Department','Channel ID'];
+  const csv = [header,...rows].map(r=>r.map(f=>`"${String(f||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  downloadCSV(csv,'msa-spreadsheet-view.csv');
+}
+
+function refreshSpreadsheet() { loadSpreadsheetView(); }
 
 function convertToCSV(events) {
   const headers = ['Channel ID', 'Title', 'Description', 'Status', 'Type', 'Due Date', 'Assigned To', 'Room', 'Signup URL', 'Created'];
@@ -1497,5 +1928,17 @@ window.addEventListener('resize', () => {
     } else if (currentText === '🔐' || currentText.includes('Not logged in')) {
       updateApiStatus('🔐 Not logged in', type);
     }
+  }
+  
+  // Handle sidebar behavior on resize
+  const sidebar = document.querySelector('.sidebar');
+  const mainContent = document.querySelector('.main-content');
+  
+  if (window.innerWidth > 768) {
+    // Desktop: remove mobile 'open' class
+    sidebar.classList.remove('open');
+  } else {
+    // Mobile: remove desktop collapsed state
+    mainContent.classList.remove('sidebar-collapsed');
   }
 });
