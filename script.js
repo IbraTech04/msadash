@@ -461,7 +461,8 @@ async function loadAllData() {
     await Promise.all([
       loadDashboardStats(),
       loadRecentActivity(),
-      loadMiniCalendar()
+      loadMiniCalendar(),
+      loadCycleView()
     ]);
     console.log('✅ All data loaded');
   } catch (error) {
@@ -801,25 +802,294 @@ async function loadRecentActivity() {
 // ========== CALENDAR FUNCTIONS ==========
 async function loadMiniCalendar() {
   const container = document.getElementById('mini-calendar');
-  if (container) {
-    const today = new Date();
-    const monthName = today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    const upcomingCount = currentEvents.filter(e => {
-      const dueDate = new Date(e.posting_date + 'T00:00:00');
-      const isDone = !!(e.status && e.status.includes('Done'));
-      const isBlocked = !!(e.status && e.status.includes('Blocked'));
-      return dueDate >= today && !isDone && !isBlocked;
-    }).length;
+  if (!container) return;
+  
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth();
+  const monthName = today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  
+  // Get first day of month and number of days
+  const firstDay = new Date(currentYear, currentMonth, 1);
+  const lastDay = new Date(currentYear, currentMonth + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  const startingDayOfWeek = firstDay.getDay(); // 0 = Sunday
+  
+  // Get events for this month
+  const monthEvents = currentEvents.filter(e => {
+    const dueDate = new Date(e.posting_date + 'T00:00:00');
+    return dueDate.getMonth() === currentMonth && dueDate.getFullYear() === currentYear;
+  });
+  
+  // Group events by day
+  const eventsByDay = {};
+  monthEvents.forEach(e => {
+    const dueDate = new Date(e.posting_date + 'T00:00:00');
+    const day = dueDate.getDate();
+    if (!eventsByDay[day]) eventsByDay[day] = [];
+    eventsByDay[day].push(e);
+  });
+  
+  // Build calendar grid
+  let calendarHTML = `
+    <div class="mini-cal-header">
+      <div class="mini-cal-month">${monthName}</div>
+    </div>
+    <div class="mini-cal-grid">
+      <div class="mini-cal-weekday">Su</div>
+      <div class="mini-cal-weekday">Mo</div>
+      <div class="mini-cal-weekday">Tu</div>
+      <div class="mini-cal-weekday">We</div>
+      <div class="mini-cal-weekday">Th</div>
+      <div class="mini-cal-weekday">Fr</div>
+      <div class="mini-cal-weekday">Sa</div>
+  `;
+  
+  // Empty cells before first day
+  for (let i = 0; i < startingDayOfWeek; i++) {
+    calendarHTML += '<div class="mini-cal-day empty"></div>';
+  }
+  
+  // Days of the month
+  for (let day = 1; day <= daysInMonth; day++) {
+    const isToday = day === today.getDate() && currentMonth === today.getMonth() && currentYear === today.getFullYear();
+    const events = eventsByDay[day] || [];
+    const hasEvents = events.length > 0;
     
-    container.innerHTML = `
-      <div class="mini-calendar-content">
-        <div class="mini-calendar-month">${monthName}</div>
-        <div class="mini-calendar-stat">
-          <span class="mini-calendar-number">${upcomingCount}</span>
-          <span class="mini-calendar-label">Upcoming Deadlines</span>
-        </div>
+    let statusClass = '';
+    let eventIndicator = '';
+    let tooltipContent = '';
+    
+    if (hasEvents) {
+      // Show dot indicators based on status
+      const hasPending = events.some(e => e.status && (e.status.includes('Queue') || e.status.includes('Progress') || e.status.includes('Awaiting')));
+      const hasDone = events.some(e => e.status && e.status.includes('Done'));
+      const hasBlocked = events.some(e => e.status && e.status.includes('Blocked'));
+      
+      if (hasBlocked) statusClass = 'has-blocked';
+      else if (hasPending) statusClass = 'has-pending';
+      else if (hasDone) statusClass = 'has-done';
+      
+      eventIndicator = `<div class="mini-cal-dots">${'•'.repeat(Math.min(events.length, 3))}</div>`;
+      
+      // Build tooltip with event list
+      tooltipContent = events.map(e => {
+        const statusEmoji = e.status?.includes('Done') ? '✅' : 
+                           e.status?.includes('Blocked') ? '🚫' : 
+                           e.status?.includes('Progress') ? '🔄' : 
+                           e.status?.includes('Awaiting') ? '⏳' : '📥';
+        return `${statusEmoji} ${escapeHtml(e.title)}`;
+      }).join('&#10;'); // Line break in HTML
+    }
+    
+    calendarHTML += `
+      <div class="mini-cal-day ${isToday ? 'today' : ''} ${statusClass}" 
+           data-day="${day}" 
+           data-has-events="${hasEvents}"
+           title="${tooltipContent || 'No events'}">
+        <span class="mini-cal-day-number">${day}</span>
+        ${eventIndicator}
       </div>
     `;
+  }
+  
+  calendarHTML += '</div>';
+  
+  // Add summary stats
+  const upcomingCount = currentEvents.filter(e => {
+    const dueDate = new Date(e.posting_date + 'T00:00:00');
+    const isDone = !!(e.status && e.status.includes('Done'));
+    const isBlocked = !!(e.status && e.status.includes('Blocked'));
+    return dueDate >= today && !isDone && !isBlocked;
+  }).length;
+  
+  calendarHTML += `
+    <div class="mini-cal-footer">
+      <span class="mini-cal-stat">📌 ${upcomingCount} upcoming</span>
+      <span class="mini-cal-stat">📋 ${monthEvents.length} this month</span>
+    </div>
+  `;
+  
+  container.innerHTML = calendarHTML;
+  
+  // Add hover tooltips for days with events
+  container.querySelectorAll('.mini-cal-day[data-has-events="true"]').forEach(dayEl => {
+    const day = parseInt(dayEl.dataset.day);
+    const events = eventsByDay[day] || [];
+    
+    if (events.length === 0) return;
+    
+    dayEl.addEventListener('mouseenter', (e) => {
+      // Remove any existing tooltip
+      document.querySelectorAll('.mini-cal-tooltip').forEach(t => t.remove());
+      
+      // Create tooltip
+      const tooltip = document.createElement('div');
+      tooltip.className = 'mini-cal-tooltip';
+      
+      const eventList = events.map(ev => {
+        const statusEmoji = ev.status?.includes('Done') ? '✅' : 
+                           ev.status?.includes('Blocked') ? '🚫' : 
+                           ev.status?.includes('Progress') ? '🔄' : 
+                           ev.status?.includes('Awaiting') ? '⏳' : '📥';
+        return `<div class="mini-cal-tooltip-item">${statusEmoji} ${escapeHtml(ev.title)}</div>`;
+      }).join('');
+      
+      tooltip.innerHTML = `
+        <div class="mini-cal-tooltip-header">${events.length} event${events.length !== 1 ? 's' : ''} on ${monthName} ${day}</div>
+        <div class="mini-cal-tooltip-list">${eventList}</div>
+      `;
+      
+      document.body.appendChild(tooltip);
+      
+      // Position tooltip
+      const rect = dayEl.getBoundingClientRect();
+      const tooltipRect = tooltip.getBoundingClientRect();
+      
+      let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+      let top = rect.bottom + 8;
+      
+      // Keep tooltip on screen
+      if (left < 10) left = 10;
+      if (left + tooltipRect.width > window.innerWidth - 10) {
+        left = window.innerWidth - tooltipRect.width - 10;
+      }
+      if (top + tooltipRect.height > window.innerHeight - 10) {
+        top = rect.top - tooltipRect.height - 8;
+      }
+      
+      tooltip.style.left = `${left}px`;
+      tooltip.style.top = `${top}px`;
+    });
+    
+    dayEl.addEventListener('mouseleave', () => {
+      setTimeout(() => {
+        document.querySelectorAll('.mini-cal-tooltip').forEach(t => t.remove());
+      }, 100);
+    });
+  });
+}
+
+// ========== CYCLE VIEW ==========
+async function loadCycleView() {
+  const container = document.getElementById('cycle-view-content');
+  if (!container) return;
+  
+  try {
+    const cycleData = await api.request('/api/workload/cycle-info', 'GET');
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    let content = '';
+    
+    // Current Development Cycle
+    if (cycleData.currentDevelopmentCycle) {
+      const dev = cycleData.currentDevelopmentCycle;
+      const startDate = parseLocalDate(dev.developmentStart);
+      const endDate = parseLocalDate(dev.developmentEnd);
+      const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+      const daysElapsed = Math.max(0, Math.ceil((today - startDate) / (1000 * 60 * 60 * 24)));
+      const daysRemaining = Math.max(0, Math.ceil((endDate - today) / (1000 * 60 * 60 * 24)));
+      const progress = Math.min(100, Math.round((daysElapsed / totalDays) * 100));
+      
+      content += `
+        <div class="cycle-section cycle-dev-section">
+          <div class="cycle-header">
+            <span class="cycle-badge dev">🎨 Development</span>
+            <span class="cycle-number">Cycle ${dev.cycleNumber}</span>
+          </div>
+          <div class="cycle-dates">
+            <span>📅 ${startDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})} - ${endDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}</span>
+          </div>
+          <div class="cycle-progress">
+            <div class="progress-bar">
+              <div class="progress-fill dev" style="width: ${progress}%"></div>
+            </div>
+            <div class="progress-text">${daysElapsed} of ${totalDays} days (${progress}%)</div>
+          </div>
+          <div class="cycle-stats">
+            <div class="cycle-stat">
+              <span class="cycle-stat-label">Days Remaining</span>
+              <span class="cycle-stat-value">${daysRemaining}</span>
+            </div>
+            <div class="cycle-stat">
+              <span class="cycle-stat-label">Task Day</span>
+              <span class="cycle-stat-value">${endDate.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    
+    // Next Development Cycle (calculated from current cycle)
+    if (cycleData.currentDevelopmentCycle) {
+      const dev = cycleData.currentDevelopmentCycle;
+      
+      // Calculate next cycle: starts day after current posting window ends
+      // Current dev cycle ends, then 14-day posting window, then next dev cycle starts
+      const currentDevEnd = parseLocalDate(dev.developmentEnd);
+      const postingWindowDays = 14;
+      const nextDevStart = new Date(currentDevEnd);
+      nextDevStart.setDate(nextDevStart.getDate() + postingWindowDays + 1);
+      
+      const nextDevEnd = new Date(nextDevStart);
+      nextDevEnd.setDate(nextDevEnd.getDate() + 13); // 14-day dev cycle (inclusive)
+      
+      const nextCycleNumber = dev.cycleNumber + 1;
+      const daysUntilNext = Math.ceil((nextDevStart - today) / (1000 * 60 * 60 * 24));
+      
+      // Next posting window starts right after next dev cycle
+      const nextPostStart = new Date(nextDevEnd);
+      nextPostStart.setDate(nextPostStart.getDate() + 1);
+      
+      const nextPostEnd = new Date(nextPostStart);
+      nextPostEnd.setDate(nextPostEnd.getDate() + 13); // 14-day posting window (inclusive)
+      
+      const daysUntilPosting = Math.ceil((nextPostStart - today) / (1000 * 60 * 60 * 24));
+      
+      content += `
+        <div class="cycle-section cycle-next-section">
+          <div class="cycle-header">
+            <span class="cycle-badge next">⏭️ Next Cycle</span>
+            <span class="cycle-number">Cycle ${nextCycleNumber}</span>
+          </div>
+          <div class="cycle-dates">
+            <span>📅 ${nextDevStart.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})} - ${nextDevEnd.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}</span>
+          </div>
+          <div class="cycle-stats">
+            <div class="cycle-stat">
+              <span class="cycle-stat-label">Starts In</span>
+              <span class="cycle-stat-value">${daysUntilNext} days</span>
+            </div>
+            <div class="cycle-stat">
+              <span class="cycle-stat-label">Duration</span>
+              <span class="cycle-stat-value">14 days</span>
+            </div>
+          </div>
+          <div class="cycle-note">
+            ℹ️ Development phase starts after current posting window ends
+          </div>
+          <div class="cycle-posting-info">
+            <div class="posting-header">📅 Posting Window</div>
+            <div class="posting-dates">
+              <span>${nextPostStart.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})} - ${nextPostEnd.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}</span>
+            </div>
+            <div class="posting-note">Content produced in this cycle will be posted during this window (${daysUntilPosting} days from now)</div>
+
+          </div>
+        </div>
+      `;
+    }
+    
+    if (!content) {
+      content = '<div class="cycle-empty">No active cycle information available</div>';
+    }
+    
+    container.innerHTML = content;
+  } catch (error) {
+    console.error('❌ Failed to load cycle info:', error);
+    container.innerHTML = '<div class="cycle-error">Unable to load cycle information</div>';
   }
 }
 
@@ -1838,6 +2108,7 @@ function renderSpreadsheetTable() {
       const statusKey = normalizeStatusKey(ev.status);
       const isDone = statusKey === 'done';
       const isBlocked = statusKey === 'blocked';
+      const discordLink = `https://discord.com/channels/1201569925481820220/${ev.channelID}`;
       body += `<tr>
         <td>${dueDate.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td>
         <td><span class="pill status ${statusKey}">${escapeHtml(ev.status || 'Unknown')}</span></td>
@@ -1846,13 +2117,41 @@ function renderSpreadsheetTable() {
         <td>${escapeHtml(ev.requester_name || '—')}</td>
         <td>${escapeHtml(ev.assigned_to_name || (isDone?'Completed':'Unassigned'))}</td>
         <td>${escapeHtml(ev.department || ev.requester_department_name || '—')}</td>
-        <td class="text-muted">${ev.channelID}</td>
+        <td class="text-muted"><a href="${discordLink}" target="_blank" rel="noopener noreferrer" class="discord-link" title="Open in Discord">💬 ${ev.channelID}</a></td>
       </tr>`;
     });
   });
 
   const footer = '</tbody></table>';
   wrapper.innerHTML = header + body + footer;
+  
+  // Add click handlers to rows (except status group rows)
+  wrapper.querySelectorAll('.table tbody tr:not(.status-group-row)').forEach(row => {
+    row.style.cursor = 'pointer';
+    row.addEventListener('click', (e) => {
+      // Don't trigger if clicking on the Discord link
+      if (e.target.closest('.discord-link')) return;
+      
+      const channelIdCell = row.querySelector('td:last-child .discord-link');
+      if (channelIdCell) {
+        const channelId = channelIdCell.textContent.replace('💬 ', '').trim();
+        const event = data.find(ev => String(ev.channelID) === channelId);
+        if (event) {
+          showEventModal(event);
+        }
+      }
+    });
+    
+    // Add hover effect
+    row.addEventListener('mouseenter', () => {
+      if (!row.classList.contains('status-group-row')) {
+        row.style.backgroundColor = 'rgba(211, 175, 90, 0.08)';
+      }
+    });
+    row.addEventListener('mouseleave', () => {
+      row.style.backgroundColor = '';
+    });
+  });
 }
 
 function exportSpreadsheetCsv() {
