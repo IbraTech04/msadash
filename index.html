@@ -265,22 +265,65 @@
       <div class="section-header">
         <h2>🧾 Spreadsheet View</h2>
         <div class="section-actions">
-          <select id="spreadsheet-type-filter" class="filter-select">
-            <option value="">All Types</option>
-            <option value="reel">Reels</option>
-            <option value="post">Posts</option>
-            <option value="poster">Posters</option>
-            <option value="video">Videos</option>
-            <option value="copy">Copy</option>
-          </select>
           <button class="action-btn" onclick="exportSpreadsheetCsv()">📤 Export</button>
+          <button class="action-btn" onclick="refreshSpreadsheet()">🔄 Refresh</button>
         </div>
       </div>
-      <div class="spreadsheet-container">
-        <div class="spreadsheet-controls">
-          <input id="spreadsheet-search" type="text" class="filter-input" placeholder="Search all columns" />
-          <button class="filter-btn primary" onclick="refreshSpreadsheet()">🔄 Refresh</button>
+      
+      <!-- Horizontal Filter Bar -->
+      <div class="spreadsheet-filters">
+        <div class="filter-bar">
+          <div class="filter-bar-item">
+            <label for="spreadsheet-search">🔍 Search</label>
+            <input type="text" id="spreadsheet-search" class="filter-input" placeholder="Search..." />
+          </div>
+          <div class="filter-bar-item">
+            <label for="spreadsheet-status-filter">Status</label>
+            <select id="spreadsheet-status-filter" class="filter-select">
+              <option value="">All Statuses</option>
+              <option value="📥 In Queue">📥 In Queue</option>
+              <option value="🔄 In Progress">🔄 In Progress</option>
+              <option value="⏳ Awaiting Posting">⏳ Awaiting Posting</option>
+              <option value="✅ Done">✅ Done</option>
+              <option value="🚫 Blocked">🚫 Blocked</option>
+            </select>
+          </div>
+          <div class="filter-bar-item">
+            <label for="spreadsheet-type-filter">Type</label>
+            <select id="spreadsheet-type-filter" class="filter-select">
+              <option value="">All Types</option>
+              <option value="poster">Poster</option>
+              <option value="social">Social</option>
+              <option value="video">Video</option>
+              <option value="copy">Copy</option>
+            </select>
+          </div>
+          <div class="filter-bar-item">
+            <label for="spreadsheet-dept-filter">Department</label>
+            <select id="spreadsheet-dept-filter" class="filter-select">
+              <option value="">All Departments</option>
+              <option value="Events">Events</option>
+              <option value="Marketing">Marketing</option>
+              <option value="Social Media">Social Media</option>
+              <option value="Design">Design</option>
+            </select>
+          </div>
+          <div class="filter-bar-actions">
+            <button class="filter-btn secondary" onclick="resetSpreadsheetFilters()" title="Reset all filters">Reset</button>
+          </div>
         </div>
+        <div class="filter-bar-footer">
+          <div class="active-filters" id="spreadsheet-active-filters"></div>
+          <div class="filter-bar-info">
+            <span id="spreadsheet-filtered-count" class="filtered-count">0 items</span>
+            <span class="separator">•</span>
+            <span id="spreadsheet-summary-inline" class="summary-inline"></span>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Spreadsheet Table -->
+      <div class="spreadsheet-container">
         <div id="spreadsheet-table-wrapper" class="table-wrapper">
           <div class="loading">Loading requests...</div>
         </div>

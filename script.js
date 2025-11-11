@@ -1478,7 +1478,7 @@ function setupEventFilters() {
 function populateAllDynamicFilters(events) {
   try {
     populateRequestFilters(events);
-    populateSpreadsheetTypeFilter(events);
+    populateSpreadsheetFilters(events);
   } catch (e) {
     console.warn('Dynamic filters population failed:', e);
   }
@@ -1543,25 +1543,36 @@ function rebuildSelect(id, options) {
   }
 }
 
-function populateSpreadsheetTypeFilter(events) {
-  const el = document.getElementById('spreadsheet-type-filter');
-  if (!el) return;
-  const current = el.value;
-  const counts = new Map();
-  events.forEach(e => counts.set(e.request_type || 'Unknown', (counts.get(e.request_type || 'Unknown')||0)+1));
-  const types = uniqueSorted(Array.from(counts.keys()));
-  while (el.firstChild) el.removeChild(el.firstChild);
-  const optAll = document.createElement('option');
-  optAll.value = '';
-  optAll.textContent = 'All Types';
-  el.appendChild(optAll);
-  types.forEach(t => {
-    const opt = document.createElement('option');
-    opt.value = t;
-    opt.textContent = `${api ? api.formatRequestType(t) : t} (${counts.get(t)})`;
-    el.appendChild(opt);
+function populateSpreadsheetFilters(events) {
+  const byStatus = new Map();
+  const byType = new Map();
+  const byDept = new Map();
+
+  events.forEach(e => {
+    const st = e.status || 'Unknown';
+    byStatus.set(st, (byStatus.get(st)||0)+1);
+    const tp = e.request_type || 'Unknown';
+    byType.set(tp, (byType.get(tp)||0)+1);
+    const dept = e.department || e.requester_department_name || 'Unknown';
+    byDept.set(dept, (byDept.get(dept)||0)+1);
   });
-  el.value = current && types.includes(current) ? current : '';
+
+  // Status order preference
+  const statusOrder = ['📥 In Queue','🔄 In Progress','⏳ Awaiting Posting','🚫 Blocked','✅ Done'];
+  const statuses = statusOrder.filter(s => byStatus.has(s)).concat(
+    uniqueSorted(Array.from(byStatus.keys()).filter(s => !statusOrder.includes(s)))
+  );
+
+  rebuildSelect('spreadsheet-status-filter', statuses.map(s => ({value:s, label:`${s} (${byStatus.get(s)})`})));
+
+  const types = uniqueSorted(Array.from(byType.keys()));
+  rebuildSelect('spreadsheet-type-filter', types.map(t => ({
+    value: t,
+    label: `${api ? api.formatRequestType(t) : t} (${byType.get(t)})`
+  })));
+
+  const depts = uniqueSorted(Array.from(byDept.keys()));
+  rebuildSelect('spreadsheet-dept-filter', depts.map(d => ({value:d, label:`${d} (${byDept.get(d)})`})));
 }
 
 function applyAllFilters() { autoFilter(); }
@@ -1695,14 +1706,25 @@ function loadSpreadsheetView() {
 }
 
 function setupSpreadsheetFilters() {
+  const statusFilter = document.getElementById('spreadsheet-status-filter');
   const typeFilter = document.getElementById('spreadsheet-type-filter');
+  const deptFilter = document.getElementById('spreadsheet-dept-filter');
   const searchInput = document.getElementById('spreadsheet-search');
+  
+  if (statusFilter && !statusFilter.dataset.bound) {
+    statusFilter.addEventListener('change', applySpreadsheetFilters);
+    statusFilter.dataset.bound = 'true';
+  }
   if (typeFilter && !typeFilter.dataset.bound) {
-    typeFilter.addEventListener('change', renderSpreadsheetTable);
+    typeFilter.addEventListener('change', applySpreadsheetFilters);
     typeFilter.dataset.bound = 'true';
   }
+  if (deptFilter && !deptFilter.dataset.bound) {
+    deptFilter.addEventListener('change', applySpreadsheetFilters);
+    deptFilter.dataset.bound = 'true';
+  }
   if (searchInput && !searchInput.dataset.bound) {
-    searchInput.addEventListener('input', debounce(renderSpreadsheetTable, 250));
+    searchInput.addEventListener('input', debounce(applySpreadsheetFilters, 250));
     searchInput.dataset.bound = 'true';
   }
 }
@@ -1722,18 +1744,57 @@ function renderSpreadsheetTable() {
   const wrapper = document.getElementById('spreadsheet-table-wrapper');
   if (!wrapper) return;
 
+  const statusVal = document.getElementById('spreadsheet-status-filter')?.value || '';
   const typeFilterVal = document.getElementById('spreadsheet-type-filter')?.value || '';
+  const deptVal = document.getElementById('spreadsheet-dept-filter')?.value || '';
   const searchVal = (document.getElementById('spreadsheet-search')?.value || '').toLowerCase().trim();
 
   let data = currentEvents.slice();
+  
+  // Apply filters
+  if (statusVal) {
+    data = data.filter(e => e.status === statusVal);
+  }
   if (typeFilterVal) {
     data = data.filter(e => (e.request_type || '').toLowerCase().includes(typeFilterVal.toLowerCase()));
+  }
+  if (deptVal) {
+    data = data.filter(e => {
+      const dept = (e.department || e.requester_department_name || '').toLowerCase();
+      return dept.includes(deptVal.toLowerCase());
+    });
   }
   if (searchVal) {
     data = data.filter(e => [e.title,e.description,e.requester_name,e.assigned_to_name,e.status,e.request_type]
       .filter(Boolean)
       .some(v => v.toLowerCase().includes(searchVal)));
   }
+
+  // Update filter chips
+  const chipsContainer = document.getElementById('spreadsheet-active-filters');
+  if (chipsContainer) {
+    chipsContainer.innerHTML = '';
+    const pushChip = (label, value, clearFn) => {
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.innerHTML = `<span>${label}: ${escapeHtml(value)}</span><button aria-label="Remove filter">✕</button>`;
+      chip.querySelector('button').onclick = clearFn;
+      chipsContainer.appendChild(chip);
+    };
+    if (statusVal) pushChip('Status', statusVal, () => { document.getElementById('spreadsheet-status-filter').selectedIndex = 0; applySpreadsheetFilters(); });
+    if (typeFilterVal) pushChip('Type', typeFilterVal, () => { document.getElementById('spreadsheet-type-filter').selectedIndex = 0; applySpreadsheetFilters(); });
+    if (deptVal) pushChip('Dept', deptVal, () => { document.getElementById('spreadsheet-dept-filter').selectedIndex = 0; applySpreadsheetFilters(); });
+    if (searchVal) pushChip('Search', searchVal, () => { document.getElementById('spreadsheet-search').value=''; applySpreadsheetFilters(); });
+  }
+
+  // Update count
+  const countEl = document.getElementById('spreadsheet-filtered-count');
+  if (countEl) {
+    countEl.textContent = `${data.length} shown`;
+  }
+
+  // Update summary
+  updateSpreadsheetSummary(data);
 
   // Sort chronologically by posting date ASC
   data.sort((a,b) => new Date(a.posting_date) - new Date(b.posting_date));
@@ -1796,12 +1857,21 @@ function renderSpreadsheetTable() {
 
 function exportSpreadsheetCsv() {
   // Reuse current filtered table data
+  const statusVal = document.getElementById('spreadsheet-status-filter')?.value || '';
   const typeFilterVal = document.getElementById('spreadsheet-type-filter')?.value || '';
+  const deptVal = document.getElementById('spreadsheet-dept-filter')?.value || '';
   const searchVal = (document.getElementById('spreadsheet-search')?.value || '').toLowerCase().trim();
+  
   let data = currentEvents.slice();
+  if (statusVal) data = data.filter(e => e.status === statusVal);
   if (typeFilterVal) data = data.filter(e => (e.request_type || '').toLowerCase().includes(typeFilterVal.toLowerCase()));
+  if (deptVal) data = data.filter(e => {
+    const dept = (e.department || e.requester_department_name || '').toLowerCase();
+    return dept.includes(deptVal.toLowerCase());
+  });
   if (searchVal) data = data.filter(e => [e.title,e.description,e.requester_name,e.assigned_to_name,e.status,e.request_type]
     .filter(Boolean).some(v => v.toLowerCase().includes(searchVal)));
+  
   data.sort((a,b) => new Date(a.posting_date) - new Date(b.posting_date));
   const rows = data.map(ev => [
     ev.posting_date,
@@ -1816,6 +1886,58 @@ function exportSpreadsheetCsv() {
   const header = ['Due Date','Status','Title','Type','Requester','Assigned To','Department','Channel ID'];
   const csv = [header,...rows].map(r=>r.map(f=>`"${String(f||'').replace(/"/g,'""')}"`).join(',')).join('\n');
   downloadCSV(csv,'msa-spreadsheet-view.csv');
+}
+
+function applySpreadsheetFilters() {
+  renderSpreadsheetTable();
+}
+
+function resetSpreadsheetFilters() {
+  ['spreadsheet-status-filter','spreadsheet-type-filter','spreadsheet-dept-filter','spreadsheet-search'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
+  });
+  applySpreadsheetFilters();
+}
+
+function updateSpreadsheetSummary(filteredEvents) {
+  const summaryEl = document.getElementById('spreadsheet-summary-inline');
+  if (!summaryEl) return;
+
+  const statuses = ['📥 In Queue', '🔄 In Progress', '⏳ Awaiting Posting', '🚫 Blocked', '✅ Done'];
+  const counts = {};
+  statuses.forEach(s => counts[s] = 0);
+  
+  filteredEvents.forEach(e => {
+    const status = e.status || 'Unknown';
+    if (counts[status] !== undefined) {
+      counts[status]++;
+    }
+  });
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  let overdueCount = 0;
+  filteredEvents.forEach(e => {
+    const dueDate = new Date(e.posting_date + 'T00:00:00');
+    const isDone = e.status && e.status.includes('Done');
+    const isBlocked = e.status && e.status.includes('Blocked');
+    if (dueDate < today && !isDone && !isBlocked) {
+      overdueCount++;
+    }
+  });
+
+  // Build inline summary text
+  const parts = [];
+  if (counts['📥 In Queue'] > 0) parts.push(`${counts['📥 In Queue']} in queue`);
+  if (counts['🔄 In Progress'] > 0) parts.push(`${counts['🔄 In Progress']} in progress`);
+  if (counts['⏳ Awaiting Posting'] > 0) parts.push(`${counts['⏳ Awaiting Posting']} awaiting`);
+  if (counts['🚫 Blocked'] > 0) parts.push(`${counts['🚫 Blocked']} blocked`);
+  if (counts['✅ Done'] > 0) parts.push(`${counts['✅ Done']} done`);
+  if (overdueCount > 0) parts.push(`⚠️ ${overdueCount} overdue`);
+
+  summaryEl.textContent = parts.length > 0 ? parts.join(' • ') : 'No items';
 }
 
 function refreshSpreadsheet() { loadSpreadsheetView(); }
