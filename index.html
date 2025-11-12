@@ -364,15 +364,20 @@
       <div class="section-header">
         <h2>📅 Interactive Deadline Calendar</h2>
         <div class="calendar-controls">
+          <button id="cycle-view-toggle" class="cycle-toggle-btn">
+            <span class="toggle-icon">🔄</span>
+            <span class="toggle-text">Cycle View: OFF</span>
+            <span class="toggle-hint">Hover to highlight • SHIFT to reverse</span>
+          </button>
           <div class="calendar-legend">
             <span class="legend-item status-inqueue">📥 In Queue</span>
             <span class="legend-item status-inprogress">🔄 In Progress</span>
             <span class="legend-item status-awaitingposting">⏳ Awaiting Posting</span>
             <span class="legend-item status-done">✅ Done</span>
             <span class="legend-item status-blocked">🚫 Blocked</span>
-            <span class="legend-item cycle-dev-legend">Dev Cycle</span>
-            <span class="legend-item cycle-post-legend">Posting Cycle</span>
-            <span class="legend-item cycle-taskday-legend">Task Assignment Day</span>
+            <span class="legend-item cycle-request-legend">Request Window</span>
+            <span class="legend-item cycle-production-legend">Production Window</span>
+            <span class="legend-item cycle-posting-legend">Posting Window</span>
           </div>
         </div>
       </div>
@@ -474,6 +479,21 @@
   <script src="env.js"></script>
   <script src="config.js"></script>
   <script src="api-service.js"></script>
+  <script src="js/msa-namespace.js"></script>
+  <script src="js/date-utils.js"></script>
+  <script src="js/stats.js"></script>
+  <script src="js/events-board.js"></script>
+  <script src="js/main-calendar.js"></script>
+  <!-- Modularized dashboard scripts -->
+  <script src="js/utils-modal.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/cycle-view.js"></script>
+  <script src="js/spreadsheet.js"></script>
+  <script src="js/recent-activity.js"></script>
+  <script src="js/mini-calendar.js"></script>
+  <script src="js/analytics.js"></script>
+  <script src="js/kanban.js"></script>
+  <script src="js/namespace-adapter.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
