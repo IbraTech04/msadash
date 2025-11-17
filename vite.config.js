@@ -68,7 +68,9 @@ export default defineConfig({
           'js/mini-calendar.js',
           'js/analytics.js',
           'js/kanban.js',
-          'js/namespace-adapter.js'
+          'js/namespace-adapter.js',
+          'msa_logo.png',
+          'msa_logo_white.png'
         ];
         
         // Create js directory in dist if it doesn't exist
