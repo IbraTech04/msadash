@@ -1,4 +1,6 @@
 import { defineConfig } from 'vite';
+import { copyFileSync, mkdirSync, existsSync } from 'fs';
+import { join } from 'path';
 
 export default defineConfig({
   // Base public path when served in production
@@ -41,5 +43,51 @@ export default defineConfig({
       '@': '/src',
       '@js': '/js'
     }
-  }
+  },
+  
+  // Custom plugin to copy non-module scripts
+  plugins: [
+    {
+      name: 'copy-scripts',
+      closeBundle() {
+        const files = [
+          'env.js',
+          'config.js', 
+          'api-service.js',
+          'script.js',
+          'js/msa-namespace.js',
+          'js/date-utils.js',
+          'js/stats.js',
+          'js/events-board.js',
+          'js/main-calendar.js',
+          'js/utils-modal.js',
+          'js/auth.js',
+          'js/cycle-view.js',
+          'js/spreadsheet.js',
+          'js/recent-activity.js',
+          'js/mini-calendar.js',
+          'js/analytics.js',
+          'js/kanban.js',
+          'js/namespace-adapter.js'
+        ];
+        
+        // Create js directory in dist if it doesn't exist
+        const jsDir = join('dist', 'js');
+        if (!existsSync(jsDir)) {
+          mkdirSync(jsDir, { recursive: true });
+        }
+        
+        files.forEach(file => {
+          const src = file;
+          const dest = join('dist', file);
+          try {
+            copyFileSync(src, dest);
+            console.log(`✓ Copied ${file}`);
+          } catch (err) {
+            console.error(`✗ Failed to copy ${file}:`, err.message);
+          }
+        });
+      }
+    }
+  ]
 });
