@@ -29,23 +29,10 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: true,
-    // Minify for production
-    minify: 'terser',
+    // Minify for production (esbuild is faster and built-in)
+    minify: 'esbuild',
     // Chunk size warnings
-    chunkSizeWarningLimit: 1000,
-    rollupOptions: {
-      output: {
-        // Manual chunks for better caching
-        manualChunks: {
-          'vendor': ['chart.js'],
-        }
-      }
-    }
-  },
-  
-  // Optimize dependencies
-  optimizeDeps: {
-    include: ['chart.js']
+    chunkSizeWarningLimit: 1000
   },
   
   // Handle legacy scripts
