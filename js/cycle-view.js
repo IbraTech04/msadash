@@ -4,12 +4,66 @@
 (function(){
   const parseLocalDate = window.MSA?.date?.parseLocalDate || (s => new Date(s + 'T00:00:00'));
 
+  // Generate cycle data for guest mode (calculates current cycle based on date)
+  function generateGuestCycleData() {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Define cycle start date (first cycle starts on a reference date)
+    // For demo purposes, we'll use a 2-week cycle pattern
+    const referenceStart = new Date('2025-01-06'); // First Monday of 2025
+    const cycleDurationDays = 14;
+    const postingWindowDays = 14;
+    const totalCycleDays = cycleDurationDays + postingWindowDays;
+    
+    // Calculate which cycle we're in
+    const daysSinceReference = Math.floor((today - referenceStart) / (1000 * 60 * 60 * 24));
+    const cycleNumber = Math.floor(daysSinceReference / totalCycleDays) + 1;
+    const dayInCycle = daysSinceReference % totalCycleDays;
+    
+    // Calculate current development cycle
+    const currentCycleStart = new Date(referenceStart);
+    currentCycleStart.setDate(currentCycleStart.getDate() + ((cycleNumber - 1) * totalCycleDays));
+    
+    const currentCycleEnd = new Date(currentCycleStart);
+    currentCycleEnd.setDate(currentCycleEnd.getDate() + cycleDurationDays - 1);
+    
+    // Format dates as YYYY-MM-DD
+    const formatDate = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    return {
+      currentDevelopmentCycle: {
+        cycleNumber: cycleNumber,
+        developmentStart: formatDate(currentCycleStart),
+        developmentEnd: formatDate(currentCycleEnd)
+      }
+    };
+  }
+
   async function loadCycleView(){
     const container = document.getElementById('cycle-view-content');
     if (!container) return;
     const api = window.apiService || window.api;
+    
+    // Check if in guest mode
+    const isGuest = window.isGuestMode || false;
+    
     try {
-      const cycleData = await api.request('/api/workload/cycle-info','GET');
+      let cycleData;
+      
+      if (isGuest) {
+        // Generate cycle data locally for guest mode
+        cycleData = generateGuestCycleData();
+      } else {
+        // Fetch from API for authenticated users
+        cycleData = await api.request('/api/workload/cycle-info','GET');
+      }
+      
       const today = new Date(); today.setHours(0,0,0,0);
       let content = '';
       if (cycleData.currentDevelopmentCycle){

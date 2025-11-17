@@ -4618,6 +4618,108 @@ body.dark-mode .fc-daygrid-day.day-task-assignment {
   height: 24px;
 }
 
+.login-divider {
+  margin: 1.5rem 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  position: relative;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 40%;
+  height: 1px;
+  background: var(--medium-gray);
+}
+
+.login-divider::before {
+  left: 0;
+}
+
+.login-divider::after {
+  right: 0;
+}
+
+.night-mode .login-divider {
+  color: var(--night-text-muted);
+}
+
+.night-mode .login-divider::before,
+.night-mode .login-divider::after {
+  background: var(--night-border);
+}
+
+.guest-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--white);
+  border: 2px solid var(--border);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.guest-button:hover {
+  background: var(--light-gray);
+  border-color: var(--primary-blue);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.guest-button:active {
+  transform: translateY(0);
+}
+
+.night-mode .guest-button {
+  color: var(--night-text-primary);
+  background: var(--night-card);
+  border-color: var(--night-border);
+}
+
+.night-mode .guest-button:hover {
+  background: var(--night-card-hover);
+  border-color: var(--night-accent);
+}
+
+.guest-note {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.night-mode .guest-note {
+  color: var(--night-text-muted);
+}
+
+.guest-limitation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  background: var(--light-gray);
+  border-radius: var(--border-radius-sm);
+  min-height: 100px;
+}
+
+.night-mode .guest-limitation {
+  color: var(--night-text-muted);
+  background: var(--night-card-hover);
+}
+
 .login-footer {
   margin-top: 3rem;
   padding-top: 2rem;

@@ -247,15 +247,22 @@
       
       const api = window.apiService || window.api;
       let events = [];
-      try {
-        if (window.currentEvents && window.currentEvents.length) {
-          events = window.currentEvents;
-        } else if (typeof window.loadEvents === 'function') {
-          events = await window.loadEvents();
-        }
-      } catch (e) {
-        console.warn('Calendar: failed to fetch events, rendering empty calendar.', e);
+      
+      // Handle guest mode - show empty calendar with cycle view capability
+      if (window.isGuestMode) {
+        console.log('📅 Loading calendar in guest mode (no events)');
         events = [];
+      } else {
+        try {
+          if (window.currentEvents && window.currentEvents.length) {
+            events = window.currentEvents;
+          } else if (typeof window.loadEvents === 'function') {
+            events = await window.loadEvents();
+          }
+        } catch (e) {
+          console.warn('Calendar: failed to fetch events, rendering empty calendar.', e);
+          events = [];
+        }
       }
       
       const calendarEvents = cycleViewMode ? [] : events.map(event => {

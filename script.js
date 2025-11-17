@@ -8,6 +8,8 @@ let charts = {};
 let calendarLoading = false;
 window.eventsLoadingPromise = window.eventsLoadingPromise || null;
 let api = null; // Will be initialized when API service is ready
+let isGuestMode = false; // Track if user is in guest mode
+window.isGuestMode = false; // Expose to window for other modules
 
 // Wait for DOM and API service to load
 document.addEventListener("DOMContentLoaded", async () => {
@@ -38,7 +40,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Check authentication first
   const isAuthenticated = await checkAuthentication();
   
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !isGuestMode) {
     // Show login screen instead of loading data
     showLoginScreen();
     return;
@@ -50,9 +52,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.history.replaceState({}, document.title, '/');
   }
   
-  // Load data only if authenticated
-  await loadAllData();
-  setupAutoRefresh();
+  // Load data only if authenticated or in guest mode
+  if (isGuestMode) {
+    loadGuestData();
+  } else {
+    await loadAllData();
+    setupAutoRefresh();
+  }
   
   console.log('✅ Dashboard initialized');
 });
@@ -110,6 +116,14 @@ function showLoginScreen() {
           Sign in with Discord
         </button>
         
+        <div class="login-divider">or</div>
+        
+        <button class="guest-button" onclick="continueAsGuest()">
+          <span>👤</span>
+          Continue as Guest
+        </button>
+        <p class="guest-note">Guest mode provides limited access to the Cycle View and Calendar features</p>
+        
         <div class="login-footer">
           <p class="ayah-login">وَقُلِ ٱعْمَلُوا۟ فَسَيَرَى ٱللَّهُ عَمَلَكُمْ</p>
           <p class="citation-login">— At-Tawbah 9:105</p>
@@ -140,6 +154,17 @@ function initiateLogin() {
   api.login();
 }
 
+function continueAsGuest() {
+  console.log('👤 Continuing as guest...');
+  isGuestMode = true;
+  window.isGuestMode = true; // Update window variable for other modules
+  hideLoginScreen();
+  updateUserGreeting(null); // Update UI for guest mode
+  updateApiStatus('👤 Guest Mode', 'warning');
+  loadGuestData();
+  showToast('Welcome! You\'re viewing in guest mode with limited features.', 'info');
+}
+
 
 
 function updateUserGreeting(user) {
@@ -157,11 +182,24 @@ function updateUserGreeting(user) {
       loginBtn.style.display = 'none';
     }
   } else if (greetingEl && !user) {
-    // Show login button when not authenticated
-    greetingEl.style.display = 'none';
-    if (loginBtn) {
-      loginBtn.style.display = 'inline-block';
-      loginBtn.onclick = initiateLogin;
+    // Handle guest mode or not authenticated
+    if (isGuestMode) {
+      greetingEl.textContent = 'السلام عليكم, Guest';
+      greetingEl.style.cursor = 'default';
+      greetingEl.style.display = 'inline-block';
+      greetingEl.onclick = null;
+      if (loginBtn) {
+        loginBtn.style.display = 'inline-block';
+        loginBtn.textContent = '🔐 Sign In';
+        loginBtn.onclick = initiateLogin;
+      }
+    } else {
+      // Show login button when not authenticated
+      greetingEl.style.display = 'none';
+      if (loginBtn) {
+        loginBtn.style.display = 'inline-block';
+        loginBtn.onclick = initiateLogin;
+      }
     }
   }
 }
@@ -334,6 +372,12 @@ function setupNavigation() {
 }
 
 function openSection(sectionId) {
+  // Check if guest mode and trying to access restricted section
+  if (window.isGuestMode && sectionId !== 'dashboard' && sectionId !== 'calendar') {
+    showToast('Please sign in to access this feature', 'warning');
+    return;
+  }
+  
   // Update navigation
   document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
   document.querySelector(`[data-section="${sectionId}"]`)?.classList.add('active');
@@ -350,13 +394,13 @@ function openSection(sectionId) {
       }
       break;
     case 'spreadsheet':
-      loadSpreadsheetView();
+      if (!window.isGuestMode) loadSpreadsheetView();
       break;
     case 'kanban':
-      loadKanbanBoard();
+      if (!window.isGuestMode) loadKanbanBoard();
       break;
     case 'analytics':
-      loadAnalytics();
+      if (!window.isGuestMode) loadAnalytics();
       break;
   }
   
@@ -472,6 +516,22 @@ async function loadAllData() {
     showToast('Failed to load dashboard data', 'error');
   }
 }
+
+function loadGuestData() {
+  console.log('👤 Loading guest mode data...');
+  // In guest mode, load cycle view and calendar (no API calls needed)
+  const container = document.getElementById('cycle-view-content');
+  if (container) {
+    loadCycleView();
+  }
+  
+  // Show message in other dashboard cards
+  showGuestModeLimitations();
+}
+
+// Expose for use by auth.js
+window.loadGuestData = loadGuestData;
+window.showGuestModeLimitations = showGuestModeLimitations;
 
 // Events board logic moved to js/events-board.js (loadEvents, displayEvents, updateEventsSummary, etc.)
 
@@ -953,6 +1013,37 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+function showGuestModeLimitations() {
+  // Update stats to show guest limitations
+  const statsElements = ['total-events', 'pending-events', 'completed-events', 'overdue-events'];
+  statsElements.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '—';
+  });
+  
+  // Show guest message in recent activity
+  const recentList = document.getElementById('recent-events-list');
+  if (recentList) {
+    recentList.innerHTML = '<div class="guest-limitation">🔐 Sign in to view recent activity</div>';
+  }
+  
+  // Show guest message in mini calendar
+  const miniCal = document.getElementById('mini-calendar');
+  if (miniCal) {
+    miniCal.innerHTML = '<div class="guest-limitation">🔐 Sign in to view calendar</div>';
+  }
+  
+  // Disable navigation items except dashboard and calendar
+  document.querySelectorAll('.nav-item').forEach(item => {
+    const section = item.getAttribute('data-section');
+    if (section !== 'dashboard' && section !== 'calendar') {
+      item.style.opacity = '0.5';
+      item.style.pointerEvents = 'none';
+      item.title = 'Sign in to access this feature';
+    }
+  });
 }
 
 // ========== API TESTING ==========

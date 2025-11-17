@@ -106,4 +106,21 @@
   window.initiateLogin = initiateLogin;
   window.updateUserGreeting = updateUserGreeting;
   window.showUserMenu = showUserMenu;
+  window.continueAsGuest = continueAsGuest; // Export for global access
+  
+  function continueAsGuest() {
+    console.log('👤 Continuing as guest (from auth.js)...');
+    window.isGuestMode = true;
+    hideLoginScreen();
+    updateUserGreeting(null);
+    if (typeof window.updateApiStatus === 'function') {
+      window.updateApiStatus('👤 Guest Mode', 'warning');
+    }
+    if (typeof window.loadGuestData === 'function') {
+      window.loadGuestData();
+    }
+    if (typeof window.showToast === 'function') {
+      window.showToast('Welcome! You\'re viewing in guest mode with limited features.', 'info');
+    }
+  }
 })();
