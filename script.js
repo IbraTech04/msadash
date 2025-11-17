@@ -1,110 +1,256 @@
 // ========== MSA MARKETING COMMAND CENTER - DASHBOARD SCRIPT ==========
+// Refactored for Spring Boot Backend API
 
-// Configuration (loaded from config.js)
-const API_CONFIG = window.MSA_CONFIG?.api || {
-  baseUrl: 'http://localhost:5000',
-  apiKey: 'your-secret-api-key',
-  timeout: 10000,
-  retryAttempts: 3
-};
-
-const FEATURES = window.MSA_CONFIG?.features || {
-  useApi: true,
-  showApiStatus: true,
-  enableNotifications: false,
-  enableOfflineMode: false
-};
-
-// Global state
-let currentEvents = [];
+// Global state (use window-scoped events so modules share a single source of truth)
+window.currentEvents = window.currentEvents || [];
 let currentCalendar = null;
 let charts = {};
 let calendarLoading = false;
-let eventsLoadingPromise = null; // prevent duplicate fetches
+window.eventsLoadingPromise = window.eventsLoadingPromise || null;
+let api = null; // Will be initialized when API service is ready
+let isGuestMode = false; // Track if user is in guest mode
+window.isGuestMode = false; // Expose to window for other modules
 
-// Generate a stable hash for events lacking an explicit id (prevents duplicates across reloads)
-function generateStableEventId(event) {
-  const base = [
-    event.title || '',
-    event.posting_date || '',
-    event.request_type || '',
-    event.department || '',
-    event.assigned_to_name || '',
-    event.requester_name || ''
-  ].join('|');
-  let hash = 0;
-  for (let i = 0; i < base.length; i++) {
-    hash = ((hash << 5) - hash) + base.charCodeAt(i);
-    hash |= 0; // Convert to 32bit int
-  }
-  return `h${Math.abs(hash)}`;
-}
-
-// Format request type with icon and styling
-function formatRequestType(requestType) {
-  if (!requestType) return 'General';
+// Wait for DOM and API service to load
+document.addEventListener("DOMContentLoaded", async () => {
+  console.log('🚀 Initializing MSA Marketing Dashboard...');
   
-  const type = requestType.toLowerCase();
-  let icon = '';
-  let displayText = requestType;
-  
-  // Add icons for specific request types
-  if (type.includes('reel')) {
-    icon = '📹 ';
-    displayText = requestType.toUpperCase();
-  } else if (type.includes('post')) {
-    icon = '📱 ';
-    displayText = requestType.toUpperCase();
-  } else if (type.includes('story')) {
-    icon = '📸 ';
-  } else if (type.includes('video')) {
-    icon = '🎥 ';
-  } else if (type.includes('graphic') || type.includes('design')) {
-    icon = '🎨 ';
-  } else if (type.includes('flyer') || type.includes('poster')) {
-    icon = '📄 ';
-  } else if (type.includes('event')) {
-    icon = '📅 ';
-  } else if (type.includes('photography') || type.includes('photo')) {
-    icon = '📷 ';
+  // Wait for API service to be ready
+  if (window.apiService) {
+    api = window.apiService;
+  } else {
+    console.error('❌ API Service not loaded!');
+    showToast('Failed to load API service', 'error');
+    return;
   }
   
-  return `${icon}${displayText}`;
-}
-
-// Wait for DOM to fully load
-document.addEventListener("DOMContentLoaded", () => {
   initializeDashboard();
   setupNavigation();
   setupModeToggle();
   applyInitialTheme();
-  checkApiHealth();
-  loadAllData();
-  setupAutoRefresh();
+  
+  // Check if we're returning from a failed auth attempt
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('error') === 'auth_failed') {
+    showToast('Authentication failed. Please ensure you are a member of the UTM MSA Discord server.', 'error');
+    // Clean up URL
+    window.history.replaceState({}, document.title, '/');
+  }
+  
+  // Check authentication first
+  const isAuthenticated = await checkAuthentication();
+  
+  if (!isAuthenticated && !isGuestMode) {
+    // Show login screen instead of loading data
+    showLoginScreen();
+    return;
+  }
+  
+  // Show success message if we just logged in
+  if (urlParams.get('logged_in') === 'true') {
+    showToast('Welcome back! Loading your dashboard...', 'success');
+    window.history.replaceState({}, document.title, '/');
+  }
+  
+  // Load data only if authenticated or in guest mode
+  if (isGuestMode) {
+    loadGuestData();
+  } else {
+    await loadAllData();
+    setupAutoRefresh();
+  }
+  
+  console.log('✅ Dashboard initialized');
 });
 
-// Handle viewport changes for mobile responsive API status
-window.addEventListener('resize', () => {
-  // Re-trigger API status update on resize to adjust mobile/desktop display
-  const statusEl = document.getElementById('api-status');
-  if (statusEl) {
-    const currentClass = statusEl.className;
-    const type = currentClass.includes('success') ? 'success' : 
-                 currentClass.includes('error') ? 'error' : 'loading';
-    const message = statusEl.textContent.includes('✅') || statusEl.textContent === 'Connected' ? '✅ Connected' :
-                   statusEl.textContent.includes('❌') || statusEl.textContent === 'Disconnected' ? '❌ Disconnected' : '🔄 Connecting...';
-    updateApiStatus(message, type);
+// ========== AUTHENTICATION ==========
+async function checkAuthentication() {
+  try {
+  const user = await api.checkAuth(); // Authentication check
+    
+    if (user) {
+      console.log('✅ User authenticated:', user);
+      updateUserGreeting(user);
+      updateApiStatus('✅ Connected', 'success');
+      hideLoginScreen();
+      return true;
+    } else {
+      console.log('⚠️ User not authenticated');
+      updateApiStatus('🔐 Not logged in', 'warning');
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ Authentication check failed:', error);
+    updateApiStatus('❌ Connection Error', 'error');
+    return false;
   }
-});
+}
+
+function showLoginScreen() {
+  console.log('🔐 Showing login screen...'); // Show login screen
+  
+  // Hide all main content
+  document.querySelector('.main-content')?.classList.add('hidden');
+  
+  // Create and show login screen
+  const loginScreen = document.createElement('div');
+  loginScreen.id = 'login-screen';
+  loginScreen.className = 'login-screen';
+  loginScreen.innerHTML = `
+    <div class="login-container">
+      <div class="login-header">
+        <img src="msa_logo.png" alt="MSA Logo" class="login-logo" />
+        <h1>UTM MSA Marketing Command Centre</h1>
+        <div class="bismillah-login">بِسْمِ ٱللَّٰهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div>
+      </div>
+      
+      <div class="login-content">
+        <h2>السلام عليكم! 👋</h2>
+        <p>Please sign in with your Discord account to access the Marketing Command Centre.</p>
+        <p class="login-requirement">✓ You must be a member of the Marketing Command Centre</p>
+        
+        <button class="login-button" onclick="initiateLogin()">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515a.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0a12.64 12.64 0 0 0-.617-1.25a.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057a19.9 19.9 0 0 0 5.993 3.03a.078.078 0 0 0 .084-.028a14.09 14.09 0 0 0 1.226-1.994a.076.076 0 0 0-.041-.106a13.107 13.107 0 0 1-1.872-.892a.077.077 0 0 1-.008-.128a10.2 10.2 0 0 0 .372-.292a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127a12.299 12.299 0 0 1-1.873.892a.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028a19.839 19.839 0 0 0 6.002-3.03a.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.956-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419c0-1.333.955-2.419 2.157-2.419c1.21 0 2.176 1.096 2.157 2.42c0 1.333-.946 2.418-2.157 2.418z"/>
+          </svg>
+          Sign in with Discord
+        </button>
+        
+        <div class="login-divider">or</div>
+        
+        <button class="guest-button" onclick="continueAsGuest()">
+          <span>👤</span>
+          Continue as Guest
+        </button>
+        <p class="guest-note">Guest mode provides limited access to the Cycle View and Calendar features</p>
+        
+        <div class="login-footer">
+          <p class="ayah-login">وَقُلِ ٱعْمَلُوا۟ فَسَيَرَى ٱللَّهُ عَمَلَكُمْ</p>
+          <p class="citation-login">— At-Tawbah 9:105</p>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(loginScreen);
+}
+
+function hideLoginScreen() {
+  const loginScreen = document.getElementById('login-screen'); // Hide login screen
+  if (loginScreen) {
+    loginScreen.remove();
+  }
+  document.querySelector('.main-content')?.classList.remove('hidden');
+}
+
+function initiateLogin() {
+  console.log('🔐 Initiating Discord OAuth2 login...'); // Initiate login
+  // Store current page so we can return after login
+  try {
+    sessionStorage.setItem('preLoginUrl', window.location.href);
+  } catch (e) {
+    console.warn('Could not save pre-login URL:', e);
+  }
+  api.login();
+}
+
+function continueAsGuest() {
+  console.log('👤 Continuing as guest...');
+  isGuestMode = true;
+  window.isGuestMode = true; // Update window variable for other modules
+  hideLoginScreen();
+  updateUserGreeting(null); // Update UI for guest mode
+  updateApiStatus('👤 Guest Mode', 'warning');
+  loadGuestData();
+  showToast('Welcome! You\'re viewing in guest mode with limited features.', 'info');
+}
+
+
+
+function updateUserGreeting(user) {
+  const greetingEl = document.querySelector('.user-greeting'); // Update user greeting
+  const loginBtn = document.getElementById('login-btn');
+  
+  if (greetingEl && user) {
+    greetingEl.textContent = `السلام عليكم, ${user.username}`;
+    greetingEl.style.cursor = 'pointer';
+    greetingEl.style.display = 'inline-block';
+    greetingEl.onclick = () => showUserMenu(user);
+    
+    // Hide login button when authenticated
+    if (loginBtn) {
+      loginBtn.style.display = 'none';
+    }
+  } else if (greetingEl && !user) {
+    // Handle guest mode or not authenticated
+    if (isGuestMode) {
+      greetingEl.textContent = 'السلام عليكم, Guest';
+      greetingEl.style.cursor = 'default';
+      greetingEl.style.display = 'inline-block';
+      greetingEl.onclick = null;
+      if (loginBtn) {
+        loginBtn.style.display = 'inline-block';
+        loginBtn.textContent = '🔐 Sign In';
+        loginBtn.onclick = initiateLogin;
+      }
+    } else {
+      // Show login button when not authenticated
+      greetingEl.style.display = 'none';
+      if (loginBtn) {
+        loginBtn.style.display = 'inline-block';
+        loginBtn.onclick = initiateLogin;
+      }
+    }
+  }
+}
+
+function showUserMenu(user) {
+  // Simple user menu - could be expanded
+  const menu = document.createElement('div'); // Show user menu
+  menu.className = 'user-dropdown';
+  menu.innerHTML = `
+    <div class="user-menu-item">
+      <img src="https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png" 
+           alt="${user.username}" 
+           class="user-avatar-small">
+      <div>
+        <div class="user-menu-name">${user.username}#${user.discriminator}</div>
+        <div class="user-menu-email">${user.email || 'No email'}</div>
+      </div>
+    </div>
+    <button class="user-menu-button" onclick="window.apiService.login()">Switch Account</button>
+  `;
+  
+  // Position and show menu (simplified - you may want to add proper positioning)
+  document.body.appendChild(menu);
+  setTimeout(() => menu.remove(), 5000); // Auto-close after 5 seconds
+}
 
 // ========== INITIALIZATION ==========
 function initializeDashboard() {
-  console.log('🚀 Initializing MSA Marketing Dashboard...');
-  
-  // Setup sidebar toggle for mobile
+  // Setup sidebar toggle
   const sidebarToggle = document.querySelector('.sidebar-toggle');
   if (sidebarToggle) {
     sidebarToggle.addEventListener('click', toggleSidebar);
+    sidebarToggle.title = 'Collapse sidebar';
+  }
+  
+  // Restore sidebar state from localStorage (desktop only)
+  if (window.innerWidth > 768) {
+    try {
+      const sidebarCollapsed = localStorage.getItem('sidebar_collapsed') === 'true';
+      if (sidebarCollapsed) {
+        const sidebar = document.querySelector('.sidebar');
+        const mainContent = document.querySelector('.main-content');
+        sidebar.classList.add('collapsed');
+        mainContent.classList.add('sidebar-collapsed');
+        if (sidebarToggle) {
+          sidebarToggle.title = 'Expand sidebar';
+        }
+      }
+    } catch (e) {
+      console.warn('Could not restore sidebar state:', e);
+    }
   }
   
   // Initialize charts placeholder
@@ -113,13 +259,108 @@ function initializeDashboard() {
   // Setup event filters
   setupEventFilters();
   
-  console.log('✅ Dashboard initialized');
+  // Setup compact mode toggle
+  setupCompactMode();
+}
+
+// ========== COMPACT MODE ==========
+function setupCompactMode() {
+  const compactToggle = document.getElementById('compact-mode-toggle'); // Setup compact mode
+  if (!compactToggle) return;
+  
+  // Restore compact mode state from localStorage
+  try {
+    const isCompact = localStorage.getItem('events_compact_mode') === 'true';
+    if (isCompact) {
+      activateCompactMode();
+    }
+  } catch (e) {
+    console.warn('Could not restore compact mode state:', e);
+  }
+  
+  // Add click handler
+  compactToggle.addEventListener('click', toggleCompactMode);
+  
+  // Add keyboard shortcut (Ctrl/Cmd + K)
+  document.addEventListener('keydown', (e) => {
+    // Check if we're in the events section
+    const eventsSection = document.getElementById('events');
+    if (!eventsSection || !eventsSection.classList.contains('active')) return;
+    
+    // Check for Ctrl+K or Cmd+K
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      toggleCompactMode();
+    }
+  });
+}
+
+function toggleCompactMode() {
+  const container = document.getElementById('task-container'); // Toggle compact mode
+  const toggle = document.getElementById('compact-mode-toggle');
+  
+  if (!container || !toggle) return;
+  
+  const isCurrentlyCompact = container.classList.contains('compact-mode');
+  
+  if (isCurrentlyCompact) {
+    deactivateCompactMode();
+  } else {
+    activateCompactMode();
+  }
+}
+
+function activateCompactMode() {
+  const container = document.getElementById('task-container'); // Activate compact mode
+  const toggle = document.getElementById('compact-mode-toggle');
+  
+  if (container) {
+    container.classList.add('compact-mode');
+  }
+  
+  if (toggle) {
+    toggle.classList.add('active');
+    toggle.innerHTML = '<span>📐</span> Compact: ON';
+  }
+  
+  // Save preference
+  try {
+    localStorage.setItem('events_compact_mode', 'true');
+  } catch (e) {
+    console.warn('Could not save compact mode state:', e);
+  }
+  
+  // Show brief notification
+  showToast('Compact mode enabled', 'success');
+}
+
+function deactivateCompactMode() {
+  const container = document.getElementById('task-container'); // Deactivate compact mode
+  const toggle = document.getElementById('compact-mode-toggle');
+  
+  if (container) {
+    container.classList.remove('compact-mode');
+  }
+  
+  if (toggle) {
+    toggle.classList.remove('active');
+    toggle.innerHTML = '<span>📐</span> Compact Mode';
+  }
+  
+  // Save preference
+  try {
+    localStorage.setItem('events_compact_mode', 'false');
+  } catch (e) {
+    console.warn('Could not save compact mode state:', e);
+  }
+  
+  // Show brief notification
+  showToast('Compact mode disabled', 'success');
 }
 
 // ========== NAVIGATION ==========
 function setupNavigation() {
-  const navItems = document.querySelectorAll('.nav-item');
-  const sections = document.querySelectorAll('.content-section');
+  const navItems = document.querySelectorAll('.nav-item'); // Setup navigation
   
   navItems.forEach(item => {
     item.addEventListener('click', (e) => {
@@ -131,6 +372,12 @@ function setupNavigation() {
 }
 
 function openSection(sectionId) {
+  // Check if guest mode and trying to access restricted section
+  if (window.isGuestMode && sectionId !== 'dashboard' && sectionId !== 'calendar') {
+    showToast('Please sign in to access this feature', 'warning');
+    return;
+  }
+  
   // Update navigation
   document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
   document.querySelector(`[data-section="${sectionId}"]`)?.classList.add('active');
@@ -142,16 +389,18 @@ function openSection(sectionId) {
   // Load section-specific data
   switch(sectionId) {
     case 'calendar':
-      loadMainCalendar();
+      if (typeof window.loadMainCalendar === 'function') {
+        window.loadMainCalendar();
+      }
+      break;
+    case 'spreadsheet':
+      if (!window.isGuestMode) loadSpreadsheetView();
       break;
     case 'kanban':
-      loadKanbanBoard();
+      if (!window.isGuestMode) loadKanbanBoard();
       break;
     case 'analytics':
-      loadAnalytics();
-      break;
-    case 'team':
-      loadTeamData();
+      if (!window.isGuestMode) loadAnalytics();
       break;
   }
   
@@ -162,12 +411,39 @@ function openSection(sectionId) {
 }
 
 function toggleSidebar() {
-  document.querySelector('.sidebar').classList.toggle('open');
+  const sidebar = document.querySelector('.sidebar'); // Toggle sidebar
+  const mainContent = document.querySelector('.main-content');
+  const toggleBtn = document.querySelector('.sidebar-toggle');
+  
+  // For mobile: toggle open/close
+  if (window.innerWidth <= 768) {
+    sidebar.classList.toggle('open');
+  } else {
+    // For desktop: toggle collapse
+    sidebar.classList.toggle('collapsed');
+    mainContent.classList.toggle('sidebar-collapsed');
+    
+    // Update toggle button icon
+    if (sidebar.classList.contains('collapsed')) {
+      toggleBtn.textContent = '☰';
+      toggleBtn.title = 'Expand sidebar';
+    } else {
+      toggleBtn.textContent = '☰';
+      toggleBtn.title = 'Collapse sidebar';
+    }
+    
+    // Save preference
+    try {
+      localStorage.setItem('sidebar_collapsed', sidebar.classList.contains('collapsed'));
+    } catch (e) {
+      console.warn('Could not save sidebar state:', e);
+    }
+  }
 }
 
 // ========== MODE TOGGLE ==========
 function setupModeToggle() {
-  const toggleButton = document.getElementById("toggle-mode");
+  const toggleButton = document.getElementById("toggle-mode"); // Setup mode toggle
   if (!toggleButton) return;
   
   toggleButton.addEventListener("click", () => {
@@ -179,8 +455,12 @@ function setupModeToggle() {
       logo.src = isNightMode ? "msa_logo_white.png" : "msa_logo.png";
     }
     toggleButton.textContent = isNightMode ? "☀️" : "🌙";
-    // persist user preference
-    try { localStorage.setItem('msa_theme', isNightMode ? 'dark' : 'light'); } catch (e) { /* ignore */ }
+    
+    try { 
+      localStorage.setItem('msa_theme', isNightMode ? 'dark' : 'light'); 
+    } catch (e) { 
+      console.warn('Failed to save theme preference:', e);
+    }
     
     // Update charts for night mode
     if (isNightMode) {
@@ -191,9 +471,8 @@ function setupModeToggle() {
   });
 }
 
-// Apply initial theme based on config, saved preference, or OS preference
 function applyInitialTheme() {
-  try {
+  try { // Apply initial theme
     const saved = localStorage.getItem('msa_theme');
     const configTheme = window.MSA_CONFIG?.ui?.theme || 'auto';
     let useDark = false;
@@ -203,7 +482,6 @@ function applyInitialTheme() {
     else if (configTheme === 'dark') useDark = true;
     else if (configTheme === 'light') useDark = false;
     else {
-      // auto -> follow OS preference
       useDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
 
@@ -213,320 +491,55 @@ function applyInitialTheme() {
       if (logo) logo.src = 'msa_logo_white.png';
       const toggleButton = document.getElementById('toggle-mode');
       if (toggleButton) toggleButton.textContent = '☀️';
-      updateChartsForNightMode();
-    } else {
-      document.body.classList.remove('night-mode');
-      const logo = document.getElementById('logo');
-      if (logo) logo.src = 'msa_logo.png';
-      const toggleButton = document.getElementById('toggle-mode');
-      if (toggleButton) toggleButton.textContent = '🌙';
-      updateChartsForDayMode();
     }
   } catch (e) {
-    console.warn('Theme init failed', e);
-  }
-}
-
-// ========== API FUNCTIONS ==========
-async function makeApiRequest(endpoint, options = {}) {
-  const url = `${API_CONFIG.baseUrl}${endpoint}`;
-  const defaultOptions = {
-    headers: {
-      'X-API-Key': API_CONFIG.apiKey,
-      'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': 'true'
-    }
-  };
-  
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
-  
-  try {
-    console.log(`🔄 API Request: ${url}`);
-    
-    const response = await fetch(url, { 
-      ...defaultOptions, 
-      ...options,
-      signal: controller.signal
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-    }
-    
-    const jsonData = await response.json();
-    console.log(`📦 API Response:`, jsonData);
-    
-    return jsonData;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    console.error('API request error:', error);
-    showToast(error.message, 'error');
-    return null;
-  }
-}
-
-async function checkApiHealth() {
-  if (!FEATURES.showApiStatus) return;
-  
-  const healthData = await makeApiRequest('/api/health');
-  
-  if (healthData) {
-    console.log('✅ API Health Check:', healthData);
-    updateApiStatus('✅ Connected', 'success');
-    updateSystemStatus('api-indicator', '🟢');
-  } else {
-    updateApiStatus('❌ Disconnected', 'error');
-    updateSystemStatus('api-indicator', '🔴');
-  }
-}
-
-function updateApiStatus(message, type) {
-  const statusEl = document.getElementById('api-status');
-  if (statusEl) {
-    // Check if mobile viewport
-    const isMobile = window.innerWidth <= 768;
-    
-    if (isMobile) {
-      // Show just the icon on mobile
-      if (message.includes('Connected')) {
-        statusEl.textContent = '✅';
-      } else if (message.includes('Disconnected')) {
-        statusEl.textContent = '❌';
-      } else {
-        statusEl.textContent = '🔄';
-      }
-    } else {
-      // Show full text on desktop
-      statusEl.textContent = message;
-    }
-    
-    statusEl.className = `api-status ${type}`;
-  }
-}
-
-function updateSystemStatus(indicatorId, status) {
-  const indicator = document.getElementById(indicatorId);
-  if (indicator) {
-    indicator.textContent = status;
+    console.warn('Theme init failed:', e);
   }
 }
 
 // ========== DATA LOADING ==========
 async function loadAllData() {
-  console.log('🔄 Loading all dashboard data...');
-  // Always load events first once
-  await loadEvents();
-  // Then parallelize dependent but read-only computations
-  await Promise.all([
-    loadDashboardStats(),
-    loadRecentActivity(),
-    loadMiniCalendar()
-  ]);
-  console.log('✅ All data loaded');
-}
-
-async function loadEvents() {
-  // Reuse in-flight promise to avoid multiple network calls
-  if (eventsLoadingPromise) {
-    return eventsLoadingPromise;
-  }
-  eventsLoadingPromise = (async () => {
-    const data = await makeApiRequest('/api/events');
-    if (data && data.success && Array.isArray(data.events)) {
-      currentEvents = data.events;
-      displayEvents(currentEvents);
-      updateEventsSummary(currentEvents);
-      return currentEvents;
-    } else {
-      console.warn('Failed to load events');
-      return [];
-    }
-  })();
+  console.log('🔄 Loading all dashboard data...'); // Load all data
   try {
-    return await eventsLoadingPromise;
-  } finally {
-    eventsLoadingPromise = null; // allow future refreshes
+    await loadEvents(); // sets window.currentEvents
+    // Populate dynamic filters based on the freshly loaded dataset
+    populateAllDynamicFilters(window.currentEvents);
+    await Promise.all([
+      loadDashboardStats(),
+      loadRecentActivity(),
+      loadMiniCalendar(),
+      loadCycleView()
+    ]);
+    console.log('✅ All data loaded');
+  } catch (error) {
+    console.error('❌ Failed to load data:', error);
+    showToast('Failed to load dashboard data', 'error');
   }
 }
 
-function displayEvents(events) {
-  const container = document.getElementById("task-container");
-  if (!container) return;
-  
-  container.innerHTML = '';
-  
-  if (events.length === 0) {
-    container.innerHTML = '<div class="loading">No events found</div>';
-    return;
+function loadGuestData() {
+  console.log('👤 Loading guest mode data...');
+  // In guest mode, load cycle view and calendar (no API calls needed)
+  const container = document.getElementById('cycle-view-content');
+  if (container) {
+    loadCycleView();
   }
   
-  // Group events by status
-  const eventsByStatus = {};
-  const statusOrder = ['📥 In Queue', '🔄 In Progress', '⏳ Awaiting Approval', '⏳ Awaiting Posting', '✅ Done', ''];
-  
-  events.forEach(event => {
-    const status = event.status || 'No Status';
-    if (!eventsByStatus[status]) eventsByStatus[status] = [];
-    eventsByStatus[status].push(event);
-  });
-  
-  // Display events by status
-  statusOrder.forEach(status => {
-    if (!eventsByStatus[status] || eventsByStatus[status].length === 0) return;
-    
-    const section = document.createElement("div");
-    section.className = "status-section";
-    
-    const header = document.createElement("div");
-    header.className = "status-header";
-    header.innerHTML = `
-      <h3>${status || 'No Status'} (${eventsByStatus[status].length})</h3>
-      <span class="collapse-icon">▼</span>
-    `;
-    
-    // Make entire header clickable
-    header.addEventListener('click', () => toggleStatusSection(section));
-    
-    const content = document.createElement("div");
-    content.className = "status-content";
-    
-    eventsByStatus[status].forEach(event => {
-      const eventCard = createEventCard(event);
-      content.appendChild(eventCard);
-    });
-    
-    section.appendChild(header);
-    section.appendChild(content);
-    container.appendChild(section);
-  });
+  // Show message in other dashboard cards
+  showGuestModeLimitations();
 }
 
-// Toggle status section collapse/expand
-function toggleStatusSection(statusSection) {
-  const content = statusSection.querySelector('.status-content');
-  const icon = statusSection.querySelector('.collapse-icon');
-  
-  if (content.style.display === 'none') {
-    content.style.display = 'block';
-    icon.textContent = '▼';
-    statusSection.classList.remove('collapsed');
-  } else {
-    content.style.display = 'none';
-    icon.textContent = '▶';
-    statusSection.classList.add('collapsed');
-  }
-}
+// Expose for use by auth.js
+window.loadGuestData = loadGuestData;
+window.showGuestModeLimitations = showGuestModeLimitations;
 
-function createEventCard(event) {
-  const dueDate = new Date(event.posting_date);
-  const daysUntilDue = Math.ceil((dueDate - new Date()) / (1000 * 60 * 60 * 24));
-  const isOverdue = daysUntilDue < 0;
-  const isUrgent = daysUntilDue <= 2 && daysUntilDue >= 0;
-  
-  const urgencyClass = isOverdue ? 'overdue' : isUrgent ? 'urgent' : '';
-  const discordLink = generateDiscordChannelLink(event);
-  
-  const card = document.createElement('div');
-  card.className = `event-card ${urgencyClass}`;
-  card.innerHTML = `
-    <div class="event-header">
-      <div class="event-title">${event.title}</div>
-      <div class="event-type">${formatRequestType(event.request_type)}</div>
-    </div>
-    <div class="event-details">
-      <div><strong>Description:</strong> ${event.description}</div>
-      <div><strong>Department:</strong> ${event.department || 'N/A'}${event.subgroup ? ` (${event.subgroup})` : ''}</div>
-      <div><strong>Assigned to:</strong> ${event.assigned_to_name || 'Unassigned'}</div>
-      <div><strong>Due Date:</strong> 
-        <span class="due-date ${urgencyClass}">
-          ${dueDate.toLocaleDateString()} 
-          ${isOverdue ? `(${Math.abs(daysUntilDue)} days overdue!)` : 
-            isUrgent ? `(${daysUntilDue} days left!)` : 
-            `(${daysUntilDue} days left)`}
-        </span>
-      </div>
-      <div><strong>Status:</strong> ${event.status || 'No Status'}</div>
-      <div><strong>Discord:</strong> 
-        <a href="${discordLink}" target="_blank" class="discord-link">
-          💬 View in Discord
-        </a>
-      </div>
-      ${event.notes ? `<div><strong>Notes:</strong> ${event.notes}</div>` : ''}
-    </div>
-    <div class="event-meta">
-      <small>Created: ${new Date(event.created_at).toLocaleDateString()}</small>
-    </div>
-  `;
-  
-  // Add click handler to show modal
-  card.addEventListener('click', (e) => {
-    // Don't open modal if user clicked on the Discord link
-    if (!e.target.closest('.discord-link')) {
-      showEventModal(event);
-    }
-  });
-  
-  return card;
-}
-
-function updateEventsSummary(events) {
-  const summaryContainer = document.getElementById('events-summary');
-  if (!summaryContainer) return;
-  
-  const statusCounts = {
-    total: events.length,
-    pending: events.filter(e => !e.status || e.status.includes('Queue') || e.status.includes('Progress') || e.status.includes('Awaiting')).length,
-    completed: events.filter(e => e.status && e.status.includes('Done')).length,
-    overdue: events.filter(e => {
-      const dueDate = new Date(e.posting_date);
-      const isDone = e.status && e.status.includes('Done');
-      return dueDate < new Date() && !isDone;
-    }).length
-  };
-  
-  summaryContainer.innerHTML = `
-    <h3>📊 Events Summary</h3>
-    <div class="summary-stats">
-      <div class="summary-stat">
-        <span class="summary-number">${statusCounts.total}</span>
-        <span class="summary-label">Total Events</span>
-      </div>
-      <div class="summary-stat">
-        <span class="summary-number">${statusCounts.pending}</span>
-        <span class="summary-label">Pending</span>
-      </div>
-      <div class="summary-stat">
-        <span class="summary-number">${statusCounts.completed}</span>
-        <span class="summary-label">Completed</span>
-      </div>
-      <div class="summary-stat">
-        <span class="summary-number">${statusCounts.overdue}</span>
-        <span class="summary-label">Overdue</span>
-      </div>
-    </div>
-  `;
-}
+// Events board logic moved to js/events-board.js (loadEvents, displayEvents, updateEventsSummary, etc.)
 
 // ========== DASHBOARD STATS ==========
 async function loadDashboardStats() {
-  const events = currentEvents;
-  if (!events || events.length === 0) return;
+  const events = window.currentEvents || [];
+  const stats = window.computeEventStats ? window.computeEventStats(events) : {total:0,pending:0,completed:0,overdue:0};
   
-  const stats = {
-    total: events.length,
-    pending: events.filter(e => !e.status || !e.status.includes('Done')).length,
-    completed: events.filter(e => e.status && e.status.includes('Done')).length,
-    overdue: events.filter(e => {
-      const dueDate = new Date(e.posting_date);
-      const isDone = e.status && e.status.includes('Done');
-      return dueDate < new Date() && !isDone;
-    }).length
-  };
-  
-  // Update dashboard stats
   updateElement('total-events', stats.total);
   updateElement('pending-events', stats.pending);
   updateElement('completed-events', stats.completed);
@@ -541,369 +554,31 @@ function updateElement(id, value) {
 }
 
 // ========== RECENT ACTIVITY ==========
-async function loadRecentActivity() {
-  const events = currentEvents;
-  if (!events || events.length === 0) return;
-  const recentEvents = events
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    .slice(0, 5);
-  
-  const container = document.getElementById('recent-events-list');
-  if (!container) return;
-  
-  if (recentEvents.length === 0) {
-    container.innerHTML = '<div class="loading">No recent activity</div>';
-    return;
-  }
-  
-  container.innerHTML = recentEvents.map(event => `
-    <div class="recent-item">
-      <div class="recent-title">${event.title}</div>
-      <div class="recent-meta">
-        ${formatRequestType(event.request_type)} • ${new Date(event.created_at).toLocaleDateString()}
-      </div>
-    </div>
-  `).join('');
-}
+// Moved to js/recent-activity.js and exposed as window.loadRecentActivity
 
 // ========== CALENDAR FUNCTIONS ==========
-async function loadMiniCalendar() {
-  // Placeholder for mini calendar - could implement a simple month view
-  const container = document.getElementById('mini-calendar');
-  if (container) {
-    container.innerHTML = '<div class="text-center">Mini calendar coming soon</div>';
-  }
-}
+// Moved loadMiniCalendar to js/mini-calendar.js and exposed as window.loadMiniCalendar
 
-async function loadMainCalendar() {
-  const calendarEl = document.getElementById("main-calendar");
-  if (!calendarEl) return;
-  
-  // Prevent multiple simultaneous calendar loads
-  if (calendarLoading) {
-    console.log('⏸️ Calendar already loading, skipping...');
-    return;
-  }
-  
-  calendarLoading = true;
-  console.log('🔄 Loading main calendar...');
-  
-  try {
-    // Destroy previous instance completely
-    if (currentCalendar) {
-      try {
-        currentCalendar.destroy();
-        currentCalendar = null;
-      } catch (e) {
-        console.warn('Error destroying calendar:', e);
-      }
-    }
-    
-    // Clear the calendar container to ensure no leftover elements
-    calendarEl.innerHTML = '';
-    
-    const events = currentEvents.length > 0 ? currentEvents : await loadEvents();
-    
-    console.log(`📅 Creating calendar with ${events.length} events`);
-    
-    // Convert API events to calendar format
-    const calendarEvents = events.map(event => {
-      const rawId = (event.id && String(event.id)) || generateStableEventId(event);
-      const dueDate = new Date(event.posting_date);
-      const isOverdue = dueDate < new Date();
-      const isUrgent = Math.ceil((dueDate - new Date()) / (1000 * 60 * 60 * 24)) <= 2;
-      
-      return {
-        id: `event-${rawId}`,
-        title: `${event.title}${event.status ? ` (${event.status})` : ' (No Status)'}`,
-        start: event.posting_date.split('T')[0],
-        extendedProps: {
-          description: event.description,
-          assignedTo: event.assigned_to_name,
-          requester: event.requester_name,
-          department: event.department,
-          status: event.status,
-          requestType: event.request_type,
-          notes: event.notes,
-          originalEvent: event
-        },
-        backgroundColor: getEventColor(event.status),
-        borderColor: getEventColor(event.status),
-        classNames: [
-          isOverdue ? 'event-overdue' : '',
-          isUrgent ? 'event-urgent' : '',
-          `status-${normalizeStatusForCSS(event.status)}`
-        ].filter(Boolean)
-      };
-    });
-    
-    console.log(`📅 Calendar events created: ${calendarEvents.length}`);
-    
-  // Create new calendar instance
-    currentCalendar = new FullCalendar.Calendar(calendarEl, {
-      initialView: "dayGridMonth",
-      height: "auto",
-      events: calendarEvents,
-      headerToolbar: {
-        left: 'prev,next today',
-        center: 'title',
-        right: 'dayGridMonth,timeGridWeek,listWeek'
-      },
-      eventClick: function(info) {
-        showEventModal(info.event.extendedProps.originalEvent);
-      },
-      eventDidMount: function(info) {
-        // Store reference id for tooltip management
-        info.el.dataset.tooltipEventId = info.event.id;
-      },
-      eventMouseEnter: function(info) {
-        showCalendarTooltip(info);
-      },
-      eventMouseLeave: function(info) {
-        hideCalendarTooltip(info);
-      }
-    });
-    
-    currentCalendar.render();
-    console.log('✅ Calendar rendered successfully');
-  } finally {
-    calendarLoading = false;
-  }
-}
+// ========== CYCLE VIEW ==========
+// Moved cycle view logic to js/cycle-view.js (window.loadCycleView)
 
-// ========== HELPER FUNCTIONS ==========
-function normalizeStatusForCSS(status) {
-  if (!status || status === '') return 'nostatus';
-  return status.replace(/[^a-zA-Z]/g, '').toLowerCase();
-}
+// ========== CALENDAR CYCLE HELPERS ==========
+// Calendar cycle helpers moved to js/main-calendar.js
 
-function getEventColor(status) {
-  const statusColors = {
-    '📥 In Queue': '#6c757d',
-    '🔄 In Progress': '#007bff',
-    '⏳ Awaiting Approval': '#ffc107',
-    '⏳ Awaiting Posting': '#ffc107',
-    '✅ Done': '#28a745',
-    '': '#6c757d',
-    'No Status': '#6c757d'
-  };
-  
-  return statusColors[status] || '#6c757d';
-}
+// Calendar logic moved to js/main-calendar.js (window.loadMainCalendar)
 
-function generateDiscordChannelLink(event) {
-  const guildId = '1165706299393183754';
-  // Use channel_id if available, or generate a placeholder link
-  const channelId = event.channel_id || event.id || 'unknown';
-  return `https://discord.com/channels/${guildId}/${channelId}`;
-}
+// ========== KANBAN BOARD ==========
+// Kanban board logic now lives in js/kanban.js. Removed duplicate implementation.
 
-// Calendar tooltip management
-let activeCalTooltip = null;
-function showCalendarTooltip(info) {
-  const props = info.event.extendedProps;
-  hideCalendarTooltip();
-  const tooltip = document.createElement('div');
-  tooltip.className = 'fc-tooltip global';
-  tooltip.innerHTML = `
-    <strong>${info.event.title}</strong><br>
-    ${(props.department || '')} ${formatRequestType(props.requestType) || ''}<br>
-    ${props.assignedTo ? 'Assigned: ' + props.assignedTo : ''}
-  `;
-  document.body.appendChild(tooltip);
-  // Position near mouse/event element
-  const rect = info.el.getBoundingClientRect();
-  const top = window.scrollY + rect.top + rect.height + 4;
-  const left = window.scrollX + rect.left;
-  tooltip.style.position = 'absolute';
-  tooltip.style.top = `${top}px`;
-  tooltip.style.left = `${left}px`;
-  tooltip.style.opacity = '1';
-  activeCalTooltip = tooltip;
-}
-function hideCalendarTooltip() {
-  if (activeCalTooltip) {
-    activeCalTooltip.remove();
-    activeCalTooltip = null;
-  }
-}
-
-// ========== KANBAN BOARD FUNCTIONS ==========
-async function loadKanbanBoard() {
-  try {
-    if (!currentEvents || currentEvents.length === 0) {
-      document.getElementById('kanban-container').innerHTML = '<div class="loading">🔄 Loading data...</div>';
-      return;
-    }
-    
-    displayKanbanBoard(currentEvents);
-  } catch (error) {
-    console.error('❌ Error loading Kanban board:', error);
-    document.getElementById('kanban-container').innerHTML = '<div class="loading error">❌ Error loading Kanban board</div>';
-  }
-}
-
-function displayKanbanBoard(events) {
-  const container = document.getElementById('kanban-container');
-  if (!container) return;
-  
-  // Define the columns/statuses
-  const statuses = [
-    '📥 In Queue',
-    '🔄 In Progress', 
-    '⏳ Awaiting Approval',
-    '⏳ Awaiting Posting',
-    '✅ Done'
-  ];
-  
-  // Filter events by department if filter is set
-  const departmentFilter = document.getElementById('kanban-filter')?.value;
-  const filteredEvents = departmentFilter ? 
-    events.filter(event => event.department_key === departmentFilter) : 
-    events;
-  
-  // Group events by status
-  const eventsByStatus = statuses.reduce((acc, status) => {
-    acc[status] = filteredEvents.filter(event => event.status === status);
-    return acc;
-  }, {});
-  
-  // Create the Kanban columns
-  container.innerHTML = statuses.map(status => {
-    const statusEvents = eventsByStatus[status] || [];
-    const cards = statusEvents.map((event, index) => {
-      // Find the index in filteredEvents array
-      const eventIndex = filteredEvents.findIndex(e => 
-        (e.id && e.id === event.id) || 
-        (e.title === event.title && e.posting_date === event.posting_date)
-      );
-      return createKanbanCard(event, eventIndex);
-    }).join('');
-    
-    return `
-      <div class="kanban-column" data-status="${status}">
-        <div class="kanban-header">
-          <div class="kanban-title">
-            ${status}
-          </div>
-          <div class="kanban-count">${statusEvents.length}</div>
-        </div>
-        <div class="kanban-cards">
-          ${cards || '<div class="kanban-empty">No items</div>'}
-        </div>
-      </div>
-    `;
-  }).join('');
-  
-  // Add click handlers to cards
-  container.querySelectorAll('.kanban-card').forEach((card, index) => {
-    card.addEventListener('click', () => {
-      // Get event index from data attribute
-      const eventIndex = parseInt(card.dataset.eventIndex, 10);
-      const eventData = filteredEvents[eventIndex];
-      if (eventData) {
-        showEventModal(eventData);
-      }
-    });
-  });
-}
-
-function createKanbanCard(event, eventIndex) {
-  const dueDate = new Date(event.posting_date);
-  const daysUntilDue = Math.ceil((dueDate - new Date()) / (1000 * 60 * 60 * 24));
-  const isOverdue = daysUntilDue < 0;
-  const isUrgent = daysUntilDue <= 2 && daysUntilDue >= 0;
-  
-  const dueDateClass = isOverdue ? 'overdue' : isUrgent ? 'urgent' : '';
-  const dueDateText = isOverdue ? 
-    `${Math.abs(daysUntilDue)} days overdue` : 
-    isUrgent ? 
-      `${daysUntilDue} days left` : 
-      `Due ${dueDate.toLocaleDateString()}`;
-  
-  // Escape HTML to prevent XSS and broken attributes
-  const escapeHtml = (str) => {
-    if (!str) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  };
-  
-  return `
-    <div class="kanban-card" data-event-index="${eventIndex}">
-      <div class="kanban-card-type">${formatRequestType(event.request_type)}</div>
-      <div class="kanban-card-title">${escapeHtml(event.title)}</div>
-      <div class="kanban-card-department">${escapeHtml(event.department_name) || 'N/A'}</div>
-      <div class="kanban-card-meta">
-        <div class="kanban-card-due ${dueDateClass}">${dueDateText}</div>
-        ${event.assigned_to_name ? `<div>👤 ${escapeHtml(event.assigned_to_name)}</div>` : '<div>👤 Unassigned</div>'}
-        ${event.location ? `<div>📍 ${escapeHtml(event.location)}</div>` : ''}
-      </div>
-    </div>
-  `;
-}
-
-function refreshKanban() {
-  loadKanbanBoard();
-}
-
-// Setup Kanban filter
-document.addEventListener('DOMContentLoaded', () => {
-  const kanbanFilter = document.getElementById('kanban-filter');
-  if (kanbanFilter) {
-    kanbanFilter.addEventListener('change', () => {
-      displayKanbanBoard(currentEvents);
-    });
-  }
-});
-
-// ========== MODAL FUNCTIONS ==========
-function showEventModal(event) {
-  const discordLink = generateDiscordChannelLink(event);
-  
-  const modal = document.createElement('div');
-  modal.className = 'modal-overlay';
-  modal.innerHTML = `
-    <div class="modal">
-      <button class="modal-close">×</button>
-      <h2>${event.title}</h2>
-      <div class="modal-details">
-        <p><strong>Description:</strong> ${event.description || 'N/A'}</p>
-        <p><strong>Due Date:</strong> ${new Date(event.posting_date).toLocaleDateString()}</p>
-        <p><strong>Status:</strong> ${event.status || 'No Status'}</p>
-        <p><strong>Type:</strong> ${formatRequestType(event.request_type) || 'N/A'}</p>
-        <p><strong>Department:</strong> ${event.department || 'N/A'}</p>
-        <p><strong>Assigned to:</strong> ${event.assigned_to_name || 'Unassigned'}</p>
-        <p><strong>Discord Channel:</strong> 
-          <a href="${discordLink}" target="_blank" class="discord-link">
-            💬 Open in Discord
-          </a>
-        </p>
-        ${event.notes ? `<p><strong>Notes:</strong> ${event.notes}</p>` : ''}
-        <p><strong>Created:</strong> ${new Date(event.created_at).toLocaleDateString()}</p>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(modal);
-  
-  const close = () => modal.remove();
-  modal.querySelector('.modal-close').onclick = close;
-  modal.onclick = e => { if (e.target === modal) close(); };
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); }, { once: true });
-}
+// showEventModal removed; canonical implementation is in js/utils-modal.js
 
 // ========== ANALYTICS ==========
 function initializeCharts() {
-  // Chart.js configuration will be added here
   console.log('📊 Charts initialized');
 }
 
 async function loadAnalytics() {
-  if (!currentEvents.length) {
+  if (!window.currentEvents.length) {
     await loadEvents();
   }
   
@@ -917,7 +592,6 @@ function updateStatusChart() {
   const canvas = document.getElementById('statusChart');
   if (!canvas) return;
   
-  // Destroy existing chart
   if (charts.status) {
     charts.status.destroy();
   }
@@ -925,7 +599,7 @@ function updateStatusChart() {
   const ctx = canvas.getContext('2d');
   const statusCounts = {};
   
-  currentEvents.forEach(event => {
+  window.currentEvents.forEach(event => {
     const status = event.status || 'No Status';
     statusCounts[status] = (statusCounts[status] || 0) + 1;
   });
@@ -937,7 +611,7 @@ function updateStatusChart() {
       datasets: [{
         data: Object.values(statusCounts),
         backgroundColor: [
-          '#3498db', '#f39c12', '#9b59b6', '#27ae60', '#6c757d'
+          '#007bff', '#ffc107', '#28a745', '#dc3545', '#6c757d'
         ]
       }]
     },
@@ -957,10 +631,9 @@ function updateTimelineChart() {
   }
   
   const ctx = canvas.getContext('2d');
-  
-  // Group events by month
   const monthCounts = {};
-  currentEvents.forEach(event => {
+  
+  window.currentEvents.forEach(event => {
     const month = new Date(event.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
     monthCounts[month] = (monthCounts[month] || 0) + 1;
   });
@@ -970,7 +643,7 @@ function updateTimelineChart() {
     data: {
       labels: Object.keys(monthCounts),
       datasets: [{
-        label: 'Events Created',
+        label: 'Requests Created',
         data: Object.values(monthCounts),
         borderColor: '#007bff',
         backgroundColor: 'rgba(0, 123, 255, 0.1)',
@@ -995,7 +668,7 @@ function updateTypeChart() {
   const ctx = canvas.getContext('2d');
   const typeCounts = {};
   
-  currentEvents.forEach(event => {
+  window.currentEvents.forEach(event => {
     const type = event.request_type || 'Unknown';
     typeCounts[type] = (typeCounts[type] || 0) + 1;
   });
@@ -1018,18 +691,16 @@ function updateTypeChart() {
 }
 
 function updateMetrics() {
-  // Calculate metrics
-  const completedEvents = currentEvents.filter(e => e.status && e.status.includes('Done'));
-  const totalEvents = currentEvents.length;
+  const completedEvents = window.currentEvents.filter(e => e.status && e.status.includes('Done'));
+  const totalEvents = window.currentEvents.length;
   const successRate = totalEvents > 0 ? Math.round((completedEvents.length / totalEvents) * 100) : 0;
   
-  updateElement('avg-completion', '5 days'); // Placeholder
+  updateElement('avg-completion', '5 days');
   updateElement('success-rate', `${successRate}%`);
-  updateElement('peak-day', 'Monday'); // Placeholder
+  updateElement('peak-day', 'Monday');
 }
 
 function updateChartsForNightMode() {
-  // Update chart colors for night mode
   Object.values(charts).forEach(chart => {
     if (chart && chart.options) {
       chart.options.plugins = chart.options.plugins || {};
@@ -1041,7 +712,6 @@ function updateChartsForNightMode() {
 }
 
 function updateChartsForDayMode() {
-  // Update chart colors for day mode
   Object.values(charts).forEach(chart => {
     if (chart && chart.options) {
       chart.options.plugins = chart.options.plugins || {};
@@ -1052,93 +722,182 @@ function updateChartsForDayMode() {
   });
 }
 
-// ========== TEAM DATA ==========
-async function loadTeamData() {
-  const container = document.getElementById('team-roles');
-  if (!container) return;
-  
-  // Real team members data for 2025-2026
-  const teamMembers = [
-    // Marketing Directors
-    { name: 'Ibrahim Chehab', role: 'Marketing Director', year: '4th', gender: 'Brother', avatar: '👨‍💼' },
-    { name: 'Farah Ismail', role: 'Marketing Director', year: '3rd', gender: 'Sister', avatar: '👩‍💼' },
-    
-    // Social Media Managers
-    { name: 'Nadia Silim', role: 'Social Media Manager', year: '1st', gender: 'Sister', avatar: '👩‍💻' },
-    { name: 'Wafa Malik', role: 'Social Media Manager', year: '2nd', gender: 'Sister', avatar: '👩‍💻' },
-    { name: 'Rocio Escalante', role: 'Social Media Manager', year: '3rd', gender: 'Sister', avatar: '👩‍💻' },
-    
-    // Content Creators
-    { name: 'Mustafa Sajjad', role: 'Content Creator', year: '5+', gender: 'Brother', avatar: '👨‍✍️' },
-    { name: 'Faris Khalili', role: 'Content Creator', year: '5+', gender: 'Brother', avatar: '👨‍✍️' },
-    { name: 'Zunairah Khan', role: 'Content Creator', year: '2nd', gender: 'Sister', avatar: '👩‍✍️' },
-    { name: 'Ayesha Wahab', role: 'Content Creator', year: '1st', gender: 'Sister', avatar: '👩‍✍️' },
-    
-    // Graphic Designers
-    { name: 'Wakeel Ibrahim', role: 'Graphic Designer', year: '2nd', gender: 'Brother', avatar: '👨‍🎨' },
-    { name: 'Zoha Fatima Quadry', role: 'Graphic Designer', year: '2nd', gender: 'Sister', avatar: '👩‍🎨' },
-    { name: 'Jasra Irfan', role: 'Graphic Designer', year: '4th', gender: 'Sister', avatar: '👩‍🎨' },
-    { name: 'Taimaa Al Nemer', role: 'Graphic Designer', year: '4th', gender: 'Sister', avatar: '👩‍🎨' },
-    { name: 'Fahmi Masnun Ashraf', role: 'Graphic Designer', year: '2nd', gender: 'Sister', avatar: '👩‍🎨' },
-    { name: 'Haleema Khalid', role: 'Graphic Designer', year: '3rd', gender: 'Sister', avatar: '👩‍🎨' },
-    
-    // Photographer
-    { name: 'Fathima Karim', role: 'Photographer', year: '3rd', gender: 'Sister', avatar: '👩‍📷' }
-  ];
-
-  // Group members by role for better organization
-  const roleGroups = teamMembers.reduce((groups, member) => {
-    const role = member.role;
-    if (!groups[role]) groups[role] = [];
-    groups[role].push(member);
-    return groups;
-  }, {});
-
-  // Generate HTML grouped by role in horizontal layout
-  const roleOrder = ['Marketing Director', 'Social Media Manager', 'Content Creator', 'Graphic Designer', 'Photographer'];
-  
-  container.innerHTML = roleOrder.map(role => {
-    if (!roleGroups[role]) return '';
-    
-    return `
-      <div class="role-section">
-        <h3 class="role-title">${role}${roleGroups[role].length > 1 ? 's' : ''}</h3>
-        <div class="team-horizontal-grid">
-          ${roleGroups[role].map(member => `
-            <div class="team-card">
-              <div class="team-avatar">${member.avatar}</div>
-              <div class="team-info">
-                <div class="team-name">${member.name}</div>
-                <div class="team-role">${member.role}</div>
-                <div class="team-year">${member.year} Year ${member.gender}</div>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
 // ========== EVENT FILTERS ==========
 function setupEventFilters() {
   const statusFilter = document.getElementById('status-filter');
-  if (statusFilter) {
-    statusFilter.addEventListener('change', filterEvents);
+  const typeFilter = document.getElementById('type-filter');
+  const deptFilter = document.getElementById('dept-filter');
+  const searchInput = document.getElementById('request-search');
+
+  if (statusFilter) statusFilter.addEventListener('change', autoFilter);
+  if (typeFilter) typeFilter.addEventListener('change', autoFilter);
+  if (deptFilter) deptFilter.addEventListener('change', autoFilter);
+  if (searchInput) {
+    searchInput.addEventListener('input', debounce(autoFilter, 250));
   }
 }
 
-function filterEvents() {
-  const statusFilter = document.getElementById('status-filter');
-  const selectedStatus = statusFilter?.value || '';
-  
-  let filteredEvents = currentEvents;
-  if (selectedStatus) {
-    filteredEvents = currentEvents.filter(event => event.status === selectedStatus);
+// Build dynamic filter dropdowns from dataset
+function populateAllDynamicFilters(events) {
+  try {
+    populateRequestFilters(events);
+    populateSpreadsheetFilters(events);
+  } catch (e) {
+    console.warn('Dynamic filters population failed:', e);
   }
-  
-  displayEvents(filteredEvents);
-  updateEventsSummary(filteredEvents);
+}
+
+function uniqueSorted(arr) {
+  return Array.from(new Set(arr.filter(Boolean))).sort((a,b)=>String(a).localeCompare(String(b)));
+}
+
+function populateRequestFilters(events) {
+  const byStatus = new Map();
+  const byType = new Map();
+  const byDept = new Map();
+
+  events.forEach(e => {
+    const st = e.status || 'Unknown';
+    byStatus.set(st, (byStatus.get(st)||0)+1);
+    const tp = e.request_type || 'Unknown';
+    byType.set(tp, (byType.get(tp)||0)+1);
+    const dept = e.department || e.requester_department_name || 'Unknown';
+    byDept.set(dept, (byDept.get(dept)||0)+1);
+  });
+
+  // Status order preference
+  const statusOrder = ['📥 In Queue','🔄 In Progress','⏳ Awaiting Posting','🚫 Blocked','✅ Done'];
+  const statuses = statusOrder.filter(s => byStatus.has(s)).concat(
+    uniqueSorted(Array.from(byStatus.keys()).filter(s => !statusOrder.includes(s)))
+  );
+
+  rebuildSelect('status-filter', statuses.map(s => ({value:s, label:`${s} (${byStatus.get(s)})`})));
+
+  const types = uniqueSorted(Array.from(byType.keys()));
+  rebuildSelect('type-filter', types.map(t => ({
+    value: t,
+    label: `${api ? api.formatRequestType(t) : t} (${byType.get(t)})`
+  })));
+
+  const depts = uniqueSorted(Array.from(byDept.keys()));
+  rebuildSelect('dept-filter', depts.map(d => ({value:d, label:`${d} (${byDept.get(d)})`})));
+}
+
+function rebuildSelect(id, options) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const current = el.value;
+  // Clear
+  while (el.firstChild) el.removeChild(el.firstChild);
+  const optAll = document.createElement('option');
+  optAll.value = '';
+  optAll.textContent = 'All';
+  el.appendChild(optAll);
+  options.forEach(o => {
+    const opt = document.createElement('option');
+    opt.value = o.value;
+    opt.textContent = o.label;
+    el.appendChild(opt);
+  });
+  if (current && options.some(o => String(o.value) === String(current))) {
+    el.value = current;
+  } else {
+    el.value = '';
+  }
+}
+
+function populateSpreadsheetFilters(events) {
+  const byStatus = new Map();
+  const byType = new Map();
+  const byDept = new Map();
+
+  events.forEach(e => {
+    const st = e.status || 'Unknown';
+    byStatus.set(st, (byStatus.get(st)||0)+1);
+    const tp = e.request_type || 'Unknown';
+    byType.set(tp, (byType.get(tp)||0)+1);
+    const dept = e.department || e.requester_department_name || 'Unknown';
+    byDept.set(dept, (byDept.get(dept)||0)+1);
+  });
+
+  // Status order preference
+  const statusOrder = ['📥 In Queue','🔄 In Progress','⏳ Awaiting Posting','🚫 Blocked','✅ Done'];
+  const statuses = statusOrder.filter(s => byStatus.has(s)).concat(
+    uniqueSorted(Array.from(byStatus.keys()).filter(s => !statusOrder.includes(s)))
+  );
+
+  rebuildSelect('spreadsheet-status-filter', statuses.map(s => ({value:s, label:`${s} (${byStatus.get(s)})`})));
+
+  const types = uniqueSorted(Array.from(byType.keys()));
+  rebuildSelect('spreadsheet-type-filter', types.map(t => ({
+    value: t,
+    label: `${api ? api.formatRequestType(t) : t} (${byType.get(t)})`
+  })));
+
+  const depts = uniqueSorted(Array.from(byDept.keys()));
+  rebuildSelect('spreadsheet-dept-filter', depts.map(d => ({value:d, label:`${d} (${byDept.get(d)})`})));
+}
+
+function applyAllFilters() { autoFilter(); }
+function resetRequestFilters() {
+  ['status-filter','type-filter','dept-filter','request-search'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
+  });
+  autoFilter();
+}
+
+function autoFilter() {
+  const statusVal = document.getElementById('status-filter')?.value || '';
+  const typeVal = document.getElementById('type-filter')?.value || '';
+  const deptVal = document.getElementById('dept-filter')?.value || '';
+  const searchVal = (document.getElementById('request-search')?.value || '').toLowerCase().trim();
+
+  let filtered = window.currentEvents.slice();
+
+  if (statusVal) filtered = filtered.filter(e => e.status === statusVal);
+  if (typeVal) filtered = filtered.filter(e => (e.request_type || '').toLowerCase().includes(typeVal.toLowerCase()));
+  if (deptVal) filtered = filtered.filter(e => {
+    const dept = (e.department || e.requester_department_name || '').toLowerCase();
+    return dept.includes(deptVal.toLowerCase());
+  });
+  if (searchVal) {
+    filtered = filtered.filter(e => {
+      return [e.title, e.description, e.requester_name, e.assigned_to_name]
+        .filter(Boolean)
+        .some(field => field.toLowerCase().includes(searchVal));
+    });
+  }
+
+  // Update active filter chips
+  const chipsContainer = document.getElementById('active-filters');
+  if (chipsContainer) {
+    chipsContainer.innerHTML = '';
+    const pushChip = (label, value, clearFn) => {
+      const chip = document.createElement('div');
+      chip.className = 'chip';
+      chip.innerHTML = `<span>${label}: ${escapeHtml(value)}</span><button aria-label="Remove filter">✕</button>`;
+      chip.querySelector('button').onclick = clearFn;
+      chipsContainer.appendChild(chip);
+    };
+    if (statusVal) pushChip('Status', statusVal, () => { document.getElementById('status-filter').selectedIndex = 0; autoFilter(); });
+    if (typeVal) pushChip('Type', typeVal, () => { document.getElementById('type-filter').selectedIndex = 0; autoFilter(); });
+    if (deptVal) pushChip('Dept', deptVal, () => { document.getElementById('dept-filter').selectedIndex = 0; autoFilter(); });
+    if (searchVal) pushChip('Search', searchVal, () => { document.getElementById('request-search').value=''; autoFilter(); });
+  }
+
+  // Update count badge
+  const countEl = document.getElementById('filtered-count');
+  if (countEl) countEl.textContent = `${filtered.length} shown`;
+
+  // Re-render sections with filtered events
+  displayEvents(filtered);
+  updateEventsSummary(filtered);
+}
+
+function debounce(fn, wait) {
+  let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn.apply(this,args), wait); };
 }
 
 // ========== UTILITY FUNCTIONS ==========
@@ -1154,38 +913,86 @@ function showToast(message, type = 'success') {
   }, 3000);
 }
 
+function updateApiStatus(message, type) {
+  const statusEl = document.getElementById('api-status');
+  if (statusEl) {
+    const isMobile = window.innerWidth <= 768;
+    
+    if (isMobile) {
+      if (message.includes('Connected')) {
+        statusEl.textContent = '✅';
+      } else if (message.includes('Error') || message.includes('Disconnected')) {
+        statusEl.textContent = '❌';
+      } else if (message.includes('Not logged in')) {
+        statusEl.textContent = '🔐';
+      } else {
+        statusEl.textContent = '🔄';
+      }
+    } else {
+      statusEl.textContent = message;
+    }
+    
+    statusEl.className = `api-status ${type}`;
+  }
+}
+
 function refreshData() {
   showToast('Refreshing data...', 'info');
+  window.eventsLoadingPromise = null; // Clear events load cache used by modules
+  // Optional: clear current events to reflect loading state in dependent views
+  // They will repopulate after loadAllData completes
+  // window.currentEvents = [];
   loadAllData().then(() => {
-    // If we're currently viewing the calendar, refresh it with new data
     const calendarSection = document.getElementById('calendar');
     if (calendarSection && calendarSection.classList.contains('active')) {
-      console.log('📅 Refreshing calendar with new data');
       loadMainCalendar();
     }
+    const kanbanSection = document.getElementById('kanban');
+    if (kanbanSection && kanbanSection.classList.contains('active')) {
+      loadKanbanBoard();
+    }
+    showToast('Data refreshed!', 'success');
   });
 }
 
 function exportEvents() {
-  const csv = convertToCSV(currentEvents);
-  downloadCSV(csv, 'msa-events.csv');
-  showToast('Events exported successfully!');
+  const csv = convertToCSV(window.currentEvents);
+  downloadCSV(csv, 'msa-marketing-requests.csv');
+  showToast('Requests exported successfully!');
 }
 
+// ========== SPREADSHEET VIEW ==========
+// Spreadsheet view logic moved to js/spreadsheet.js (window.loadSpreadsheetView, filters, table, export)
+
+// normalizeStatusKey moved to js/spreadsheet.js
+
+// renderSpreadsheetTable moved to js/spreadsheet.js
+
+// exportSpreadsheetCsv moved to js/spreadsheet.js
+
+// apply/reset spreadsheet filters moved to js/spreadsheet.js
+
+// updateSpreadsheetSummary moved to js/spreadsheet.js
+
+function refreshSpreadsheet() { loadSpreadsheetView(); }
+
 function convertToCSV(events) {
-  const headers = ['Title', 'Description', 'Status', 'Due Date', 'Assigned To', 'Requester', 'Type'];
+  const headers = ['Channel ID', 'Title', 'Description', 'Status', 'Type', 'Due Date', 'Assigned To', 'Room', 'Signup URL', 'Created'];
   const rows = events.map(event => [
+    event.channelID,
     event.title,
-    event.description,
+    event.description || '',
     event.status || 'No Status',
+    event.request_type || '',
     event.posting_date,
     event.assigned_to_name || 'Unassigned',
-    event.requester_name || 'N/A',
-    formatRequestType(event.request_type) || 'N/A'
+    event.room || '',
+    event.signup_url || '',
+    event.created_at
   ]);
   
   return [headers, ...rows].map(row => 
-    row.map(field => `"${field}"`).join(',')
+    row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
   ).join('\n');
 }
 
@@ -1201,6 +1008,44 @@ function downloadCSV(csv, filename) {
   document.body.removeChild(a);
 }
 
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function showGuestModeLimitations() {
+  // Update stats to show guest limitations
+  const statsElements = ['total-events', 'pending-events', 'completed-events', 'overdue-events'];
+  statsElements.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '—';
+  });
+  
+  // Show guest message in recent activity
+  const recentList = document.getElementById('recent-events-list');
+  if (recentList) {
+    recentList.innerHTML = '<div class="guest-limitation">🔐 Sign in to view recent activity</div>';
+  }
+  
+  // Show guest message in mini calendar
+  const miniCal = document.getElementById('mini-calendar');
+  if (miniCal) {
+    miniCal.innerHTML = '<div class="guest-limitation">🔐 Sign in to view calendar</div>';
+  }
+  
+  // Disable navigation items except dashboard and calendar
+  document.querySelectorAll('.nav-item').forEach(item => {
+    const section = item.getAttribute('data-section');
+    if (section !== 'dashboard' && section !== 'calendar') {
+      item.style.opacity = '0.5';
+      item.style.pointerEvents = 'none';
+      item.title = 'Sign in to access this feature';
+    }
+  });
+}
+
 // ========== API TESTING ==========
 async function testApiConnection() {
   const resultsDiv = document.getElementById('api-test-results');
@@ -1208,15 +1053,18 @@ async function testApiConnection() {
   
   resultsDiv.innerHTML = '<div class="loading">Testing API connection...</div>';
   
-  const healthData = await makeApiRequest('/api/health');
-  
-  if (healthData) {
+  try {
+    const user = await api.checkAuth();
     resultsDiv.innerHTML = `
-      <div class="success">✅ API Health Check Successful</div>
-      <pre>${JSON.stringify(healthData, null, 2)}</pre>
+      <div class="success">✅ API Connection Successful</div>
+      <div>Authenticated as: ${user ? user.username : 'Not logged in'}</div>
+      <pre>${JSON.stringify(user, null, 2)}</pre>
     `;
-  } else {
-    resultsDiv.innerHTML = '<div class="error">❌ API Health Check Failed</div>';
+  } catch (error) {
+    resultsDiv.innerHTML = `
+      <div class="error">❌ API Connection Failed</div>
+      <div>${error.message}</div>
+    `;
   }
 }
 
@@ -1224,28 +1072,79 @@ async function testApiEvents() {
   const resultsDiv = document.getElementById('api-test-results');
   if (!resultsDiv) return;
   
-  resultsDiv.innerHTML = '<div class="loading">Testing events endpoint...</div>';
+  resultsDiv.innerHTML = '<div class="loading">Testing requests endpoint...</div>';
   
-  const eventsData = await makeApiRequest('/api/events');
-  
-  if (eventsData && eventsData.success) {
+  try {
+    const requests = await api.getAllRequests();
     resultsDiv.innerHTML = `
-      <div class="success">✅ Events Endpoint Successful</div>
-      <div>Found ${eventsData.count} events</div>
-      <pre>${JSON.stringify(eventsData, null, 2)}</pre>
+      <div class="success">✅ Requests Endpoint Successful</div>
+      <div>Found ${requests.length} requests</div>
+      <pre>${JSON.stringify(requests.slice(0, 2), null, 2)}</pre>
     `;
-  } else {
-    resultsDiv.innerHTML = '<div class="error">❌ Events Endpoint Failed</div>';
+  } catch (error) {
+    resultsDiv.innerHTML = `
+      <div class="error">❌ Requests Endpoint Failed</div>
+      <div>${error.message}</div>
+    `;
   }
 }
 
 // ========== AUTO REFRESH ==========
 function setupAutoRefresh() {
-  const refreshInterval = window.MSA_CONFIG?.ui?.refreshInterval || 300000; // 5 minutes
+  const refreshInterval = window.MSA_CONFIG?.ui?.refreshInterval || 300000;
   
   setInterval(() => {
     console.log('🔄 Auto-refreshing data...');
+    window.eventsLoadingPromise = null;
     loadAllData();
   }, refreshInterval);
 }
 
+// Handle viewport changes
+window.addEventListener('resize', () => {
+  const statusEl = document.getElementById('api-status');
+  if (statusEl) {
+    const currentText = statusEl.textContent;
+    const currentClass = statusEl.className;
+    const type = currentClass.split(' ').pop();
+    
+    if (currentText === '✅' || currentText.includes('Connected')) {
+      updateApiStatus('✅ Connected', type);
+    } else if (currentText === '❌' || currentText.includes('Error') || currentText.includes('Disconnected')) {
+      updateApiStatus('❌ Connection Error', type);
+    } else if (currentText === '🔐' || currentText.includes('Not logged in')) {
+      updateApiStatus('🔐 Not logged in', type);
+    }
+  }
+  
+  // Handle sidebar behavior on resize
+  const sidebar = document.querySelector('.sidebar');
+  const mainContent = document.querySelector('.main-content');
+  
+  if (window.innerWidth > 768) {
+    // Desktop: remove mobile 'open' class
+    sidebar.classList.remove('open');
+  } else {
+    // Mobile: remove desktop collapsed state
+    mainContent.classList.remove('sidebar-collapsed');
+  }
+  
+  // Setup cycle view toggle button
+  const cycleToggleBtn = document.getElementById('cycle-view-toggle');
+  if (cycleToggleBtn) {
+    cycleToggleBtn.addEventListener('click', function() {
+      if (typeof window.toggleCycleView === 'function') {
+        window.toggleCycleView();
+      }
+    });
+  }
+});
+
+// Defensive: event delegation so the toggle works even if the button is re-rendered
+document.addEventListener('click', function(e) {
+  const tgt = e.target && (e.target.id === 'cycle-view-toggle' ? e.target : e.target.closest && e.target.closest('#cycle-view-toggle'));
+  if (!tgt) return;
+  if (typeof window.toggleCycleView === 'function') {
+    window.toggleCycleView();
+  }
+});

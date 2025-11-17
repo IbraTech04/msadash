@@ -18,7 +18,7 @@ window.MSA_CONFIG = {
       // Environment detection based on hostname
       const hostname = window.location.hostname;
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        return 'http://localhost:5000'; // Development
+        return 'http://localhost:8080'; // Spring Boot Development
       } else if (hostname.includes('staging') || hostname.includes('dev')) {
         return 'https://api-staging.utmmsa.com'; // Staging
       } else {
@@ -27,11 +27,11 @@ window.MSA_CONFIG = {
     })(),
     
     apiKey: (() => {
-      // Environment-aware API key (set in env.js)
+      // Environment-aware API key (set in env.js for bot operations)
       if (window.MSA_ENV && window.MSA_ENV.API_KEY) {
         return window.MSA_ENV.API_KEY;
       }
-      return 'your-secret-api-key'; // Fallback
+      return null; // No default API key for security
     })(),
     
     timeout: 10000, // 10 second timeout
