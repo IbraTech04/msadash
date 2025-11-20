@@ -2978,11 +2978,15 @@ body.dark-mode .fc-daygrid-day.day-task-assignment {
   box-shadow: var(--shadow-md);
   z-index: 10001;
   transform: translateX(400px);
-  transition: transform 0.3s ease;
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  pointer-events: none;
 }
 
 .toast.show {
   transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .toast.error {
@@ -2991,6 +2995,10 @@ body.dark-mode .fc-daygrid-day.day-task-assignment {
 
 .toast.warning {
   background: var(--warning);
+}
+
+.toast.info {
+  background: var(--primary-blue);
 }
 
 /* ========== ERROR DISPLAY ========== */
@@ -3862,6 +3870,12 @@ body.dark-mode .fc-daygrid-day.day-task-assignment {
   background-color: var(--night-warning);
   color: var(--night-bg-primary);
   border-color: var(--night-warning);
+}
+
+.night-mode .toast.info {
+  background-color: var(--night-accent);
+  color: white;
+  border-color: var(--night-accent);
 }
 
 .night-mode .api-error {

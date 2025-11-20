@@ -901,16 +901,32 @@ function debounce(fn, wait) {
 }
 
 // ========== UTILITY FUNCTIONS ==========
+let toastTimeout = null;
+
 function showToast(message, type = 'success') {
   const toast = document.getElementById('toast');
   if (!toast) return;
   
-  toast.textContent = message;
-  toast.className = `toast ${type} show`;
+  // Clear any existing timeout
+  if (toastTimeout) {
+    clearTimeout(toastTimeout);
+    toastTimeout = null;
+  }
   
+  // Remove show class first to reset animation
+  toast.classList.remove('show');
+  
+  // Use setTimeout to allow CSS transition to reset
   setTimeout(() => {
-    toast.classList.remove('show');
-  }, 3000);
+    toast.textContent = message;
+    toast.className = `toast ${type} show`;
+    
+    // Set new timeout to hide
+    toastTimeout = setTimeout(() => {
+      toast.classList.remove('show');
+      toastTimeout = null;
+    }, 3000);
+  }, 10);
 }
 
 function updateApiStatus(message, type) {
