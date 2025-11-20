@@ -68,6 +68,47 @@
     return div.innerHTML;
   }
 
+  // Simple markdown parser for descriptions
+  function parseMarkdown(text) {
+    if (!text) return '';
+    
+    let html = text
+      // Escape HTML first
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      // Bold: **text** or __text__
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__(.+?)__/g, '<strong>$1</strong>')
+      // Italic: *text* or _text_
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/_(.+?)_/g, '<em>$1</em>')
+      // Code: `code`
+      .replace(/`(.+?)`/g, '<code>$1</code>')
+      // Links: [text](url)
+      .replace(/\[([^\]]+)\]\(([^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+      // Headers: ## Header
+      .replace(/^### (.+)$/gm, '<h4>$1</h4>')
+      .replace(/^## (.+)$/gm, '<h3>$1</h3>')
+      .replace(/^# (.+)$/gm, '<h2>$1</h2>')
+      // Unordered lists: - item or * item
+      .replace(/^[\-\*] (.+)$/gm, '<li>$1</li>')
+      // Line breaks: double newline
+      .replace(/\n\n/g, '</p><p>')
+      // Single line breaks
+      .replace(/\n/g, '<br>');
+    
+    // Wrap list items in ul
+    html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+    
+    // Wrap in paragraph if not already wrapped
+    if (!html.startsWith('<h') && !html.startsWith('<ul>')) {
+      html = '<p>' + html + '</p>';
+    }
+    
+    return html;
+  }
+
   function showEventModal(event) {
     const api = window.apiService || window.api;
     const discordLink = api.generateDiscordChannelLink(event.channelID);
@@ -113,7 +154,7 @@
               </svg>
               <h3>Description</h3>
             </div>
-            <p class="modal-description">${escapeHtml(event.description) || 'No description provided'}</p>
+            <p class="modal-description">${parseMarkdown(event.description) || 'No description provided'}</p>
           </div>
           <div class="modal-details-grid">
             <div class="modal-detail-card ${urgencyClass}">

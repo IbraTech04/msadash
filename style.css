@@ -4958,10 +4958,101 @@ body.dark-mode .fc-daygrid-day.day-task-assignment {
   border-left: 4px solid var(--accent-gold);
 }
 
+.modal-description p {
+  margin: 0.5rem 0;
+}
+
+.modal-description p:first-child {
+  margin-top: 0;
+}
+
+.modal-description p:last-child {
+  margin-bottom: 0;
+}
+
+.modal-description strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.modal-description em {
+  font-style: italic;
+}
+
+.modal-description code {
+  background: rgba(0, 0, 0, 0.1);
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+}
+
+.modal-description a {
+  color: var(--primary-blue);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s;
+}
+
+.modal-description a:hover {
+  border-bottom-color: var(--primary-blue);
+}
+
+.modal-description ul {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.modal-description li {
+  margin: 0.25rem 0;
+}
+
+.modal-description h2,
+.modal-description h3,
+.modal-description h4 {
+  margin: 1rem 0 0.5rem 0;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.modal-description h2 {
+  font-size: 1.25rem;
+}
+
+.modal-description h3 {
+  font-size: 1.1rem;
+}
+
+.modal-description h4 {
+  font-size: 1rem;
+}
+
 .night-mode .modal-description {
   background: var(--night-bg-tertiary);
   color: var(--night-text-secondary);
   border-left-color: var(--night-accent);
+}
+
+.night-mode .modal-description strong {
+  color: var(--night-text-primary);
+}
+
+.night-mode .modal-description code {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.night-mode .modal-description a {
+  color: var(--night-accent);
+}
+
+.night-mode .modal-description a:hover {
+  border-bottom-color: var(--night-accent);
+}
+
+.night-mode .modal-description h2,
+.night-mode .modal-description h3,
+.night-mode .modal-description h4 {
+  color: var(--night-text-primary);
 }
 
 .modal-details-grid {
