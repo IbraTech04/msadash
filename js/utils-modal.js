@@ -129,7 +129,7 @@
               </svg>
               <h3>Description</h3>
             </div>
-            <p class="modal-description">${parseMarkdown(event.description) || 'No description provided'}</p>
+            <div class="modal-description">${parseMarkdown(event.description) || 'No description provided'}</div>
           </div>
           <div class="modal-details-grid">
             <div class="modal-detail-card ${urgencyClass}">

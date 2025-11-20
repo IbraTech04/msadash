@@ -4998,13 +4998,35 @@ body.dark-mode .fc-daygrid-day.day-task-assignment {
   border-bottom-color: var(--primary-blue);
 }
 
-.modal-description ul {
+.modal-description ul,
+.modal-description ol {
   margin: 0.5rem 0;
   padding-left: 1.5rem;
 }
 
 .modal-description li {
   margin: 0.25rem 0;
+}
+
+.modal-description pre {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+
+.modal-description pre code {
+  background: none;
+  padding: 0;
+}
+
+.modal-description blockquote {
+  margin: 0.75rem 0;
+  padding-left: 1rem;
+  border-left: 3px solid var(--accent-gold);
+  font-style: italic;
+  color: var(--dark-gray);
 }
 
 .modal-description h2,
@@ -5047,6 +5069,15 @@ body.dark-mode .fc-daygrid-day.day-task-assignment {
 
 .night-mode .modal-description a:hover {
   border-bottom-color: var(--night-accent);
+}
+
+.night-mode .modal-description pre {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.night-mode .modal-description blockquote {
+  border-left-color: var(--night-accent);
+  color: var(--night-text-secondary);
 }
 
 .night-mode .modal-description h2,
