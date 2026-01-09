@@ -724,14 +724,71 @@ function updateChartsForDayMode() {
 
 // ========== EVENT FILTERS ==========
 function setupEventFilters() {
-  const statusFilter = document.getElementById('status-filter');
+  const statusFilterContainer = document.getElementById('status-filter-container');
+  const deptFilterContainer = document.getElementById('dept-filter-container');
   const typeFilter = document.getElementById('type-filter');
-  const deptFilter = document.getElementById('dept-filter');
   const searchInput = document.getElementById('request-search');
 
-  if (statusFilter) statusFilter.addEventListener('change', autoFilter);
+  if (statusFilterContainer) {
+    // Setup multi-select dropdown toggle
+    const summary = document.getElementById('status-filter-summary');
+    const dropdown = document.getElementById('status-filter-dropdown');
+    
+    summary.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.toggle('active');
+      // Close dept dropdown if open
+      if (deptFilterContainer) {
+        document.getElementById('dept-filter-dropdown')?.classList.remove('active');
+      }
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!statusFilterContainer.contains(e.target)) {
+        dropdown.classList.remove('active');
+      }
+    });
+    
+    // Handle checkbox changes
+    dropdown.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+      checkbox.addEventListener('change', () => {
+        updateStatusSummary();
+        autoFilter();
+      });
+    });
+  }
+  
+  if (deptFilterContainer) {
+    // Setup multi-select dropdown toggle
+    const summary = document.getElementById('dept-filter-summary');
+    const dropdown = document.getElementById('dept-filter-dropdown');
+    
+    summary.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.toggle('active');
+      // Close status dropdown if open
+      if (statusFilterContainer) {
+        document.getElementById('status-filter-dropdown')?.classList.remove('active');
+      }
+    });
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!deptFilterContainer.contains(e.target)) {
+        dropdown.classList.remove('active');
+      }
+    });
+    
+    // Handle checkbox changes
+    dropdown.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+      checkbox.addEventListener('change', () => {
+        updateDeptSummary();
+        autoFilter();
+      });
+    });
+  }
   if (typeFilter) typeFilter.addEventListener('change', autoFilter);
-  if (deptFilter) deptFilter.addEventListener('change', autoFilter);
   if (searchInput) {
     searchInput.addEventListener('input', debounce(autoFilter, 250));
   }
@@ -771,7 +828,7 @@ function populateRequestFilters(events) {
     uniqueSorted(Array.from(byStatus.keys()).filter(s => !statusOrder.includes(s)))
   );
 
-  rebuildSelect('status-filter', statuses.map(s => ({value:s, label:`${s} (${byStatus.get(s)})`})));
+  rebuildStatusCheckboxes(statuses, byStatus);
 
   const types = uniqueSorted(Array.from(byType.keys()));
   rebuildSelect('type-filter', types.map(t => ({
@@ -780,7 +837,65 @@ function populateRequestFilters(events) {
   })));
 
   const depts = uniqueSorted(Array.from(byDept.keys()));
-  rebuildSelect('dept-filter', depts.map(d => ({value:d, label:`${d} (${byDept.get(d)})`})));
+  rebuildDeptCheckboxes(depts, byDept);
+}
+
+function rebuildStatusCheckboxes(statuses, counts) {
+  const dropdown = document.getElementById('status-filter-dropdown');
+  if (!dropdown) return;
+  
+  // Store currently selected values
+  const selected = getSelectedStatuses();
+  
+  // Clear and rebuild
+  dropdown.innerHTML = '';
+  statuses.forEach(status => {
+    const label = document.createElement('label');
+    label.className = 'multi-select-option';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = status;
+    checkbox.checked = selected.includes(status);
+    checkbox.addEventListener('change', () => {
+      updateStatusSummary();
+      autoFilter();
+    });
+    const span = document.createElement('span');
+    span.textContent = `${status} (${counts.get(status)})`;
+    label.appendChild(checkbox);
+    label.appendChild(span);
+    dropdown.appendChild(label);
+  });
+  updateStatusSummary();
+}
+
+function rebuildDeptCheckboxes(depts, counts) {
+  const dropdown = document.getElementById('dept-filter-dropdown');
+  if (!dropdown) return;
+  
+  // Store currently selected values
+  const selected = getSelectedDepts();
+  
+  // Clear and rebuild
+  dropdown.innerHTML = '';
+  depts.forEach(dept => {
+    const label = document.createElement('label');
+    label.className = 'multi-select-option';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = dept;
+    checkbox.checked = selected.includes(dept);
+    checkbox.addEventListener('change', () => {
+      updateDeptSummary();
+      autoFilter();
+    });
+    const span = document.createElement('span');
+    span.textContent = `${dept} (${counts.get(dept)})`;
+    label.appendChild(checkbox);
+    label.appendChild(span);
+    dropdown.appendChild(label);
+  });
+  updateDeptSummary();
 }
 
 function rebuildSelect(id, options) {
@@ -838,9 +953,58 @@ function populateSpreadsheetFilters(events) {
   rebuildSelect('spreadsheet-dept-filter', depts.map(d => ({value:d, label:`${d} (${byDept.get(d)})`})));
 }
 
+function updateStatusSummary() {
+  const dropdown = document.getElementById('status-filter-dropdown');
+  const summary = document.getElementById('status-filter-summary');
+  if (!dropdown || !summary) return;
+  
+  const checked = Array.from(dropdown.querySelectorAll('input[type="checkbox"]:checked'));
+  if (checked.length === 0) {
+    summary.textContent = 'All Statuses';
+  } else if (checked.length === 1) {
+    summary.textContent = checked[0].value;
+  } else {
+    summary.textContent = `${checked.length} statuses selected`;
+  }
+}
+
+function getSelectedStatuses() {
+  const dropdown = document.getElementById('status-filter-dropdown');
+  if (!dropdown) return [];
+  return Array.from(dropdown.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+}
+
+function getSelectedDepts() {
+  const dropdown = document.getElementById('dept-filter-dropdown');
+  if (!dropdown) return [];
+  return Array.from(dropdown.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+}
+
+function updateDeptSummary() {
+  const dropdown = document.getElementById('dept-filter-dropdown');
+  const summary = document.getElementById('dept-filter-summary');
+  if (!dropdown || !summary) return;
+  
+  const checked = Array.from(dropdown.querySelectorAll('input[type="checkbox"]:checked'));
+  if (checked.length === 0) {
+    summary.textContent = 'All Departments';
+  } else if (checked.length === 1) {
+    summary.textContent = checked[0].value;
+  } else {
+    summary.textContent = `${checked.length} departments selected`;
+  }
+}
+
 function applyAllFilters() { autoFilter(); }
 function resetRequestFilters() {
-  ['status-filter','type-filter','dept-filter','request-search'].forEach(id => {
+  // Reset status checkboxes
+  const statusDropdown = document.getElementById('status-filter-dropdown');
+  if (statusDropdown) {
+    statusDropdown.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    updateStatusSummary();
+  }
+  
+  ['type-filter','dept-filter','request-search'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
@@ -849,18 +1013,18 @@ function resetRequestFilters() {
 }
 
 function autoFilter() {
-  const statusVal = document.getElementById('status-filter')?.value || '';
+  const selectedStatuses = getSelectedStatuses();
+  const selectedDepts = getSelectedDepts();
   const typeVal = document.getElementById('type-filter')?.value || '';
-  const deptVal = document.getElementById('dept-filter')?.value || '';
   const searchVal = (document.getElementById('request-search')?.value || '').toLowerCase().trim();
 
   let filtered = window.currentEvents.slice();
 
-  if (statusVal) filtered = filtered.filter(e => e.status === statusVal);
+  if (selectedStatuses.length > 0) filtered = filtered.filter(e => selectedStatuses.includes(e.status));
   if (typeVal) filtered = filtered.filter(e => (e.request_type || '').toLowerCase().includes(typeVal.toLowerCase()));
-  if (deptVal) filtered = filtered.filter(e => {
-    const dept = (e.department || e.requester_department_name || '').toLowerCase();
-    return dept.includes(deptVal.toLowerCase());
+  if (selectedDepts.length > 0) filtered = filtered.filter(e => {
+    const dept = e.department || e.requester_department_name || '';
+    return selectedDepts.includes(dept);
   });
   if (searchVal) {
     filtered = filtered.filter(e => {
@@ -881,9 +1045,27 @@ function autoFilter() {
       chip.querySelector('button').onclick = clearFn;
       chipsContainer.appendChild(chip);
     };
-    if (statusVal) pushChip('Status', statusVal, () => { document.getElementById('status-filter').selectedIndex = 0; autoFilter(); });
+    if (selectedStatuses.length > 0) {
+      selectedStatuses.forEach(status => {
+        pushChip('Status', status, () => {
+          const checkbox = document.querySelector(`#status-filter-dropdown input[value="${status.replace(/"/g, '\\"')}"]`);
+          if (checkbox) checkbox.checked = false;
+          updateStatusSummary();
+          autoFilter();
+        });
+      });
+    }
+    if (selectedDepts.length > 0) {
+      selectedDepts.forEach(dept => {
+        pushChip('Dept', dept, () => {
+          const checkbox = document.querySelector(`#dept-filter-dropdown input[value="${dept.replace(/"/g, '\\"')}"]`);
+          if (checkbox) checkbox.checked = false;
+          updateDeptSummary();
+          autoFilter();
+        });
+      });
+    }
     if (typeVal) pushChip('Type', typeVal, () => { document.getElementById('type-filter').selectedIndex = 0; autoFilter(); });
-    if (deptVal) pushChip('Dept', deptVal, () => { document.getElementById('dept-filter').selectedIndex = 0; autoFilter(); });
     if (searchVal) pushChip('Search', searchVal, () => { document.getElementById('request-search').value=''; autoFilter(); });
   }
 

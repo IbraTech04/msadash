@@ -2853,6 +2853,99 @@ body.dark-mode .fc-daygrid-day.day-task-assignment {
   transform: translateY(-2px);
 }
 
+/* Multi-Select Component */
+.multi-select-container {
+  position: relative;
+  width: 100%;
+  min-width: 200px;
+}
+
+.multi-select-summary {
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--medium-gray);
+  border-radius: var(--border-radius-sm);
+  background: var(--white);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.25s;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 42px;
+}
+
+.multi-select-summary::after {
+  content: '▼';
+  font-size: 0.65rem;
+  margin-left: 0.5rem;
+  transition: transform 0.25s;
+  flex-shrink: 0;
+}
+
+.multi-select-summary:hover {
+  border-color: var(--accent-gold);
+  box-shadow: 0 2px 8px rgba(211, 175, 90, 0.2);
+}
+
+.multi-select-dropdown {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  right: 0;
+  background: var(--white);
+  border: 1px solid var(--medium-gray);
+  border-radius: var(--border-radius-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-10px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  min-width: 220px;
+}
+
+.multi-select-dropdown.active {
+  max-height: 300px;
+  overflow-y: auto;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: all;
+}
+
+.multi-select-dropdown.active ~ .multi-select-summary::after {
+  transform: rotate(180deg);
+}
+
+.multi-select-option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s;
+  user-select: none;
+}
+
+.multi-select-option:hover {
+  background: var(--light-gray);
+}
+
+.multi-select-option input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.multi-select-option span {
+  flex: 1;
+  font-size: 0.82rem;
+  line-height: 1.3;
+}
+
 /* ========== MODALS ========== */
 .modal-overlay {
   position: fixed;
@@ -3660,6 +3753,28 @@ body.dark-mode .fc-daygrid-day.day-task-assignment {
 .night-mode select option {
   background-color: var(--night-bg-secondary);
   color: var(--night-text-primary);
+}
+
+/* Multi-Select Night Mode */
+.night-mode .multi-select-summary {
+  background: var(--night-bg-tertiary);
+  border-color: var(--night-border-light);
+  color: var(--night-text-primary);
+}
+
+.night-mode .multi-select-summary:hover {
+  border-color: var(--night-accent);
+  box-shadow: 0 2px 8px rgba(255, 215, 0, 0.2);
+}
+
+.night-mode .multi-select-dropdown {
+  background: var(--night-bg-secondary);
+  border-color: var(--night-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.night-mode .multi-select-option:hover {
+  background: var(--night-bg-tertiary);
 }
 
 /* ========== MODAL - NIGHT MODE ========== */

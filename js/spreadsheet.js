@@ -4,6 +4,48 @@
 (function(){
   const api = window.apiService || window.api;
 
+  function getSpreadsheetSelectedStatuses() {
+    const dropdown = document.getElementById('spreadsheet-status-filter-dropdown');
+    if (!dropdown) return [];
+    return Array.from(dropdown.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+  }
+
+  function getSpreadsheetSelectedDepts() {
+    const dropdown = document.getElementById('spreadsheet-dept-filter-dropdown');
+    if (!dropdown) return [];
+    return Array.from(dropdown.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+  }
+
+  function updateSpreadsheetStatusSummary() {
+    const dropdown = document.getElementById('spreadsheet-status-filter-dropdown');
+    const summary = document.getElementById('spreadsheet-status-filter-summary');
+    if (!dropdown || !summary) return;
+    
+    const checked = Array.from(dropdown.querySelectorAll('input[type="checkbox"]:checked'));
+    if (checked.length === 0) {
+      summary.textContent = 'All Statuses';
+    } else if (checked.length === 1) {
+      summary.textContent = checked[0].value;
+    } else {
+      summary.textContent = `${checked.length} statuses selected`;
+    }
+  }
+
+  function updateSpreadsheetDeptSummary() {
+    const dropdown = document.getElementById('spreadsheet-dept-filter-dropdown');
+    const summary = document.getElementById('spreadsheet-dept-filter-summary');
+    if (!dropdown || !summary) return;
+    
+    const checked = Array.from(dropdown.querySelectorAll('input[type="checkbox"]:checked'));
+    if (checked.length === 0) {
+      summary.textContent = 'All Departments';
+    } else if (checked.length === 1) {
+      summary.textContent = checked[0].value;
+    } else {
+      summary.textContent = `${checked.length} departments selected`;
+    }
+  }
+
   function normalizeStatusKey(status){
     if (!status) return 'unknown';
     const s = status.toLowerCase();
@@ -16,13 +58,68 @@
   }
 
   function setupSpreadsheetFilters(){
-    const statusFilter = document.getElementById('spreadsheet-status-filter');
+    const statusFilterContainer = document.getElementById('spreadsheet-status-filter-container');
+    const deptFilterContainer = document.getElementById('spreadsheet-dept-filter-container');
     const typeFilter = document.getElementById('spreadsheet-type-filter');
-    const deptFilter = document.getElementById('spreadsheet-dept-filter');
     const searchInput = document.getElementById('spreadsheet-search');
-    if (statusFilter && !statusFilter.dataset.bound) { statusFilter.addEventListener('change', applySpreadsheetFilters); statusFilter.dataset.bound = 'true'; }
+    
+    if (statusFilterContainer && !statusFilterContainer.dataset.bound) {
+      const summary = document.getElementById('spreadsheet-status-filter-summary');
+      const dropdown = document.getElementById('spreadsheet-status-filter-dropdown');
+      
+      summary.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.classList.toggle('active');
+        if (deptFilterContainer) {
+          document.getElementById('spreadsheet-dept-filter-dropdown')?.classList.remove('active');
+        }
+      });
+      
+      document.addEventListener('click', (e) => {
+        if (!statusFilterContainer.contains(e.target)) {
+          dropdown.classList.remove('active');
+        }
+      });
+      
+      dropdown.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+          updateSpreadsheetStatusSummary();
+          applySpreadsheetFilters();
+        });
+      });
+      
+      statusFilterContainer.dataset.bound = 'true';
+    }
+    
+    if (deptFilterContainer && !deptFilterContainer.dataset.bound) {
+      const summary = document.getElementById('spreadsheet-dept-filter-summary');
+      const dropdown = document.getElementById('spreadsheet-dept-filter-dropdown');
+      
+      summary.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.classList.toggle('active');
+        if (statusFilterContainer) {
+          document.getElementById('spreadsheet-status-filter-dropdown')?.classList.remove('active');
+        }
+      });
+      
+      document.addEventListener('click', (e) => {
+        if (!deptFilterContainer.contains(e.target)) {
+          dropdown.classList.remove('active');
+        }
+      });
+      
+      dropdown.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+          updateSpreadsheetDeptSummary();
+          applySpreadsheetFilters();
+        });
+      });
+      
+      deptFilterContainer.dataset.bound = 'true';
+    }
+    
     if (typeFilter && !typeFilter.dataset.bound) { typeFilter.addEventListener('change', applySpreadsheetFilters); typeFilter.dataset.bound = 'true'; }
-    if (deptFilter && !deptFilter.dataset.bound) { deptFilter.addEventListener('change', applySpreadsheetFilters); deptFilter.dataset.bound = 'true'; }
     if (searchInput && !searchInput.dataset.bound) { searchInput.addEventListener('input', debounce(applySpreadsheetFilters, 250)); searchInput.dataset.bound = 'true'; }
   }
 
@@ -48,23 +145,44 @@
   function renderSpreadsheetTable(){
     const wrapper = document.getElementById('spreadsheet-table-wrapper');
     if (!wrapper) return;
-    const statusVal = document.getElementById('spreadsheet-status-filter')?.value || '';
+    const selectedStatuses = getSpreadsheetSelectedStatuses();
+    const selectedDepts = getSpreadsheetSelectedDepts();
     const typeFilterVal = document.getElementById('spreadsheet-type-filter')?.value || '';
-    const deptVal = document.getElementById('spreadsheet-dept-filter')?.value || '';
     const searchVal = (document.getElementById('spreadsheet-search')?.value || '').toLowerCase().trim();
     let data = (window.currentEvents || []).slice();
-    if (statusVal) data = data.filter(e => e.status === statusVal);
+    if (selectedStatuses.length > 0) data = data.filter(e => selectedStatuses.includes(e.status));
     if (typeFilterVal) data = data.filter(e => (e.request_type || '').toLowerCase().includes(typeFilterVal.toLowerCase()));
-    if (deptVal) data = data.filter(e => ((e.department || e.requester_department_name || '').toLowerCase()).includes(deptVal.toLowerCase()));
+    if (selectedDepts.length > 0) data = data.filter(e => {
+      const dept = e.department || e.requester_department_name || '';
+      return selectedDepts.includes(dept);
+    });
     if (searchVal) { data = data.filter(e => [e.title,e.description,e.requester_name,e.assigned_to_name,e.status,e.request_type].filter(Boolean).some(v => v.toLowerCase().includes(searchVal))); }
 
     const chipsContainer = document.getElementById('spreadsheet-active-filters');
     if (chipsContainer){
       chipsContainer.innerHTML = '';
       const pushChip = (label,value,clearFn)=>{ const chip=document.createElement('div'); chip.className='chip'; chip.innerHTML=`<span>${label}: ${escapeHtml(value)}</span><button aria-label="Remove filter">✕</button>`; chip.querySelector('button').onclick = clearFn; chipsContainer.appendChild(chip); };
-      if (statusVal) pushChip('Status', statusVal, () => { document.getElementById('spreadsheet-status-filter').selectedIndex = 0; applySpreadsheetFilters(); });
+      if (selectedStatuses.length > 0) {
+        selectedStatuses.forEach(status => {
+          pushChip('Status', status, () => {
+            const checkbox = document.querySelector(`#spreadsheet-status-filter-dropdown input[value="${status.replace(/"/g, '\\"')}"]`);
+            if (checkbox) checkbox.checked = false;
+            updateSpreadsheetStatusSummary();
+            applySpreadsheetFilters();
+          });
+        });
+      }
       if (typeFilterVal) pushChip('Type', typeFilterVal, () => { document.getElementById('spreadsheet-type-filter').selectedIndex = 0; applySpreadsheetFilters(); });
-      if (deptVal) pushChip('Dept', deptVal, () => { document.getElementById('spreadsheet-dept-filter').selectedIndex = 0; applySpreadsheetFilters(); });
+      if (selectedDepts.length > 0) {
+        selectedDepts.forEach(dept => {
+          pushChip('Dept', dept, () => {
+            const checkbox = document.querySelector(`#spreadsheet-dept-filter-dropdown input[value="${dept.replace(/"/g, '\\"')}"]`);
+            if (checkbox) checkbox.checked = false;
+            updateSpreadsheetDeptSummary();
+            applySpreadsheetFilters();
+          });
+        });
+      }
       if (searchVal) pushChip('Search', searchVal, () => { document.getElementById('spreadsheet-search').value=''; applySpreadsheetFilters(); });
     }
 
@@ -132,14 +250,17 @@
   }
 
   function exportSpreadsheetCsv(){
-    const statusVal = document.getElementById('spreadsheet-status-filter')?.value || '';
+    const selectedStatuses = getSpreadsheetSelectedStatuses();
+    const selectedDepts = getSpreadsheetSelectedDepts();
     const typeFilterVal = document.getElementById('spreadsheet-type-filter')?.value || '';
-    const deptVal = document.getElementById('spreadsheet-dept-filter')?.value || '';
     const searchVal = (document.getElementById('spreadsheet-search')?.value || '').toLowerCase().trim();
     let data = (window.currentEvents || []).slice();
-    if (statusVal) data = data.filter(e => e.status === statusVal);
+    if (selectedStatuses.length > 0) data = data.filter(e => selectedStatuses.includes(e.status));
     if (typeFilterVal) data = data.filter(e => (e.request_type || '').toLowerCase().includes(typeFilterVal.toLowerCase()));
-    if (deptVal) data = data.filter(e => ((e.department || e.requester_department_name || '').toLowerCase()).includes(deptVal.toLowerCase()));
+    if (selectedDepts.length > 0) data = data.filter(e => {
+      const dept = e.department || e.requester_department_name || '';
+      return selectedDepts.includes(dept);
+    });
     if (searchVal) data = data.filter(e => [e.title,e.description,e.requester_name,e.assigned_to_name,e.status,e.request_type].filter(Boolean).some(v => v.toLowerCase().includes(searchVal)));
     data.sort((a,b) => new Date(a.posting_date) - new Date(b.posting_date));
     const rows = data.map(ev => [ev.posting_date, ev.status, ev.title, ev.request_type, ev.requester_name, ev.assigned_to_name, ev.department || ev.requester_department_name || '', ev.channelID]);
@@ -149,7 +270,20 @@
   }
 
   function applySpreadsheetFilters(){ renderSpreadsheetTable(); }
-  function resetSpreadsheetFilters(){ ['spreadsheet-status-filter','spreadsheet-type-filter','spreadsheet-dept-filter','spreadsheet-search'].forEach(id => { const el=document.getElementById(id); if (!el) return; if (el.tagName==='SELECT') el.selectedIndex=0; else el.value=''; }); applySpreadsheetFilters(); }
+  function resetSpreadsheetFilters(){
+    const statusDropdown = document.getElementById('spreadsheet-status-filter-dropdown');
+    if (statusDropdown) {
+      statusDropdown.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+      updateSpreadsheetStatusSummary();
+    }
+    const deptDropdown = document.getElementById('spreadsheet-dept-filter-dropdown');
+    if (deptDropdown) {
+      deptDropdown.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+      updateSpreadsheetDeptSummary();
+    }
+    ['spreadsheet-type-filter','spreadsheet-search'].forEach(id => { const el=document.getElementById(id); if (!el) return; if (el.tagName==='SELECT') el.selectedIndex=0; else el.value=''; });
+    applySpreadsheetFilters();
+  }
 
   function loadSpreadsheetView(){
     if (!window.currentEvents || !window.currentEvents.length){ window.loadEvents().then(renderSpreadsheetTable); } else { renderSpreadsheetTable(); }

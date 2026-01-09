@@ -211,14 +211,31 @@
             <div class="filter-row">
               <div class="filter-group">
                 <label for="status-filter">Status</label>
-                <select id="status-filter" class="filter-select wide">
-                  <option value="">All</option>
-                  <option value="📥 In Queue">📥 In Queue</option>
-                  <option value="🔄 In Progress">🔄 In Progress</option>
-                  <option value="⏳ Awaiting Posting">⏳ Awaiting Posting</option>
-                  <option value="✅ Done">✅ Done</option>
-                  <option value="🚫 Blocked">🚫 Blocked</option>
-                </select>
+                <div class="multi-select-container" id="status-filter-container">
+                  <div class="multi-select-summary" id="status-filter-summary">All Statuses</div>
+                  <div class="multi-select-dropdown" id="status-filter-dropdown">
+                    <label class="multi-select-option">
+                      <input type="checkbox" value="📥 In Queue" />
+                      <span>📥 In Queue</span>
+                    </label>
+                    <label class="multi-select-option">
+                      <input type="checkbox" value="🔄 In Progress" />
+                      <span>🔄 In Progress</span>
+                    </label>
+                    <label class="multi-select-option">
+                      <input type="checkbox" value="⏳ Awaiting Posting" />
+                      <span>⏳ Awaiting Posting</span>
+                    </label>
+                    <label class="multi-select-option">
+                      <input type="checkbox" value="✅ Done" />
+                      <span>✅ Done</span>
+                    </label>
+                    <label class="multi-select-option">
+                      <input type="checkbox" value="🚫 Blocked" />
+                      <span>🚫 Blocked</span>
+                    </label>
+                  </div>
+                </div>
               </div>
               <div class="filter-group">
                 <label for="type-filter">Type</label>
@@ -233,13 +250,12 @@
             </div>
             <div class="filter-group">
               <label for="dept-filter">Department</label>
-              <select id="dept-filter" class="filter-select">
-                <option value="">All</option>
-                <option value="Events">Events</option>
-                <option value="Marketing">Marketing</option>
-                <option value="Social Media">Social Media</option>
-                <option value="Design">Design</option>
-              </select>
+              <div class="multi-select-container" id="dept-filter-container">
+                <div class="multi-select-summary" id="dept-filter-summary">All Departments</div>
+                <div class="multi-select-dropdown" id="dept-filter-dropdown">
+                  <!-- Dynamically populated by JS -->
+                </div>
+              </div>
             </div>
             <div class="filter-actions">
               <button class="filter-btn primary" onclick="applyAllFilters()">Apply</button>
@@ -290,14 +306,31 @@
           </div>
           <div class="filter-bar-item">
             <label for="spreadsheet-status-filter">Status</label>
-            <select id="spreadsheet-status-filter" class="filter-select">
-              <option value="">All Statuses</option>
-              <option value="📥 In Queue">📥 In Queue</option>
-              <option value="🔄 In Progress">🔄 In Progress</option>
-              <option value="⏳ Awaiting Posting">⏳ Awaiting Posting</option>
-              <option value="✅ Done">✅ Done</option>
-              <option value="🚫 Blocked">🚫 Blocked</option>
-            </select>
+            <div class="multi-select-container" id="spreadsheet-status-filter-container">
+              <div class="multi-select-summary" id="spreadsheet-status-filter-summary">All Statuses</div>
+              <div class="multi-select-dropdown" id="spreadsheet-status-filter-dropdown">
+                <label class="multi-select-option">
+                  <input type="checkbox" value="📥 In Queue" />
+                  <span>📥 In Queue</span>
+                </label>
+                <label class="multi-select-option">
+                  <input type="checkbox" value="🔄 In Progress" />
+                  <span>🔄 In Progress</span>
+                </label>
+                <label class="multi-select-option">
+                  <input type="checkbox" value="⏳ Awaiting Posting" />
+                  <span>⏳ Awaiting Posting</span>
+                </label>
+                <label class="multi-select-option">
+                  <input type="checkbox" value="✅ Done" />
+                  <span>✅ Done</span>
+                </label>
+                <label class="multi-select-option">
+                  <input type="checkbox" value="🚫 Blocked" />
+                  <span>🚫 Blocked</span>
+                </label>
+              </div>
+            </div>
           </div>
           <div class="filter-bar-item">
             <label for="spreadsheet-type-filter">Type</label>
@@ -311,13 +344,12 @@
           </div>
           <div class="filter-bar-item">
             <label for="spreadsheet-dept-filter">Department</label>
-            <select id="spreadsheet-dept-filter" class="filter-select">
-              <option value="">All Departments</option>
-              <option value="Events">Events</option>
-              <option value="Marketing">Marketing</option>
-              <option value="Social Media">Social Media</option>
-              <option value="Design">Design</option>
-            </select>
+            <div class="multi-select-container" id="spreadsheet-dept-filter-container">
+              <div class="multi-select-summary" id="spreadsheet-dept-filter-summary">All Departments</div>
+              <div class="multi-select-dropdown" id="spreadsheet-dept-filter-dropdown">
+                <!-- Dynamically populated by JS -->
+              </div>
+            </div>
           </div>
           <div class="filter-bar-actions">
             <button class="filter-btn secondary" onclick="resetSpreadsheetFilters()" title="Reset all filters">Reset</button>

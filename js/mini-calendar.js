@@ -68,7 +68,7 @@ window.loadMiniCalendar = function loadMiniCalendar() {
     }
 
     calendarHTML += `
-      <div class="mini-cal-day ${isToday ? 'today' : ''} ${statusClass}" data-day="${day}" data-has-events="${hasEvents}" title="${tooltipContent || 'No events'}">
+      <div class="mini-cal-day ${isToday ? 'today' : ''} ${statusClass}" data-day="${day}" data-has-events="${hasEvents}">
         <span class="mini-cal-day-number">${day}</span>
         ${eventIndicator}
       </div>`;
@@ -85,12 +85,22 @@ window.loadMiniCalendar = function loadMiniCalendar() {
   calendarHTML += `<div class="mini-cal-footer"><span class="mini-cal-stat">📌 ${upcomingCount} upcoming</span><span class="mini-cal-stat">📋 ${monthEvents.length} this month</span></div>`;
   container.innerHTML = calendarHTML;
 
+  let tooltipTimeout = null;
+
   container.querySelectorAll('.mini-cal-day[data-has-events="true"]').forEach(dayEl => {
     const day = parseInt(dayEl.dataset.day);
     const dayEvents = eventsByDay[day] || [];
     if (dayEvents.length === 0) return;
     dayEl.addEventListener('mouseenter', () => {
+      // Clear any pending removal timeout
+      if (tooltipTimeout) {
+        clearTimeout(tooltipTimeout);
+        tooltipTimeout = null;
+      }
+      
+      // Remove any existing tooltips immediately
       document.querySelectorAll('.mini-cal-tooltip').forEach(t => t.remove());
+      
       const tooltip = document.createElement('div');
       tooltip.className = 'mini-cal-tooltip';
       const eventList = dayEvents.map(ev => {
@@ -110,7 +120,11 @@ window.loadMiniCalendar = function loadMiniCalendar() {
       tooltip.style.top = `${top}px`;
     });
     dayEl.addEventListener('mouseleave', () => {
-      setTimeout(() => document.querySelectorAll('.mini-cal-tooltip').forEach(t => t.remove()), 100);
+      // Use a longer delay to prevent flickering when moving between days
+      tooltipTimeout = setTimeout(() => {
+        document.querySelectorAll('.mini-cal-tooltip').forEach(t => t.remove());
+        tooltipTimeout = null;
+      }, 200);
     });
   });
 };
