@@ -88,14 +88,15 @@
             </div>
           </div>`;
       }
-      if (cycleData.currentDevelopmentCycle){
-        const dev = cycleData.currentDevelopmentCycle;
-        const currentDevEnd = parseLocalDate(dev.developmentEnd);
-        const postingWindowDays = 14;
-        const nextDevStart = new Date(currentDevEnd); nextDevStart.setDate(nextDevStart.getDate() + postingWindowDays + 1);
-        const nextDevEnd = new Date(nextDevStart); nextDevEnd.setDate(nextDevEnd.getDate() + 13);
-        const nextCycleNumber = dev.cycleNumber + 1;
+      // Build next cycle section - use API data if available, otherwise calculate
+      if (cycleData.nextDevelopmentCycle) {
+        // Use API-provided next cycle data
+        const next = cycleData.nextDevelopmentCycle;
+        const nextDevStart = parseLocalDate(next.developmentStart);
+        const nextDevEnd = parseLocalDate(next.developmentEnd);
+        const nextCycleNumber = next.cycleNumber;
         const daysUntilNext = Math.ceil((nextDevStart - today)/(1000*60*60*24));
+        // Posting window for next cycle starts after the next development cycle ends
         const nextPostStart = new Date(nextDevEnd); nextPostStart.setDate(nextPostStart.getDate() + 1);
         const nextPostEnd = new Date(nextPostStart); nextPostEnd.setDate(nextPostEnd.getDate() + 13);
         const daysUntilPosting = Math.ceil((nextPostStart - today)/(1000*60*60*24));
@@ -107,7 +108,35 @@
               <div class="cycle-stat"><span class="cycle-stat-label">Starts In</span><span class="cycle-stat-value">${daysUntilNext} days</span></div>
               <div class="cycle-stat"><span class="cycle-stat-label">Duration</span><span class="cycle-stat-value">14 days</span></div>
             </div>
-            <div class="cycle-note">ℹ️ Development phase starts after current posting window ends</div>
+            <div class="cycle-note">ℹ️ Next development phase starts after current cycle ends</div>
+            <div class="cycle-posting-info">
+              <div class="posting-header">📅 Posting Window</div>
+              <div class="posting-dates"><span>${nextPostStart.toLocaleDateString('en-US',{month:'short',day:'numeric'})} - ${nextPostEnd.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span></div>
+              <div class="posting-note">Content produced in this cycle will be posted during this window (${daysUntilPosting} days from now)</div>
+            </div>
+          </div>`;
+      } else if (cycleData.currentDevelopmentCycle){
+        // Calculate next cycle from current cycle
+        const dev = cycleData.currentDevelopmentCycle;
+        const currentDevEnd = parseLocalDate(dev.developmentEnd);
+        // Next development cycle starts immediately after current one ends
+        const nextDevStart = new Date(currentDevEnd); nextDevStart.setDate(nextDevStart.getDate() + 1);
+        const nextDevEnd = new Date(nextDevStart); nextDevEnd.setDate(nextDevStart.getDate() + 13);
+        const nextCycleNumber = dev.cycleNumber + 1;
+        const daysUntilNext = Math.ceil((nextDevStart - today)/(1000*60*60*24));
+        // Posting window for next cycle starts after the next development cycle ends
+        const nextPostStart = new Date(nextDevEnd); nextPostStart.setDate(nextPostStart.getDate() + 1);
+        const nextPostEnd = new Date(nextPostStart); nextPostEnd.setDate(nextPostEnd.getDate() + 13);
+        const daysUntilPosting = Math.ceil((nextPostStart - today)/(1000*60*60*24));
+        content += `
+          <div class="cycle-section cycle-next-section">
+            <div class="cycle-header"><span class="cycle-badge next">⏭️ Next Cycle</span><span class="cycle-number">Cycle ${nextCycleNumber}</span></div>
+            <div class="cycle-dates"><span>📅 ${nextDevStart.toLocaleDateString('en-US',{month:'short',day:'numeric'})} - ${nextDevEnd.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span></div>
+            <div class="cycle-stats">
+              <div class="cycle-stat"><span class="cycle-stat-label">Starts In</span><span class="cycle-stat-value">${daysUntilNext} days</span></div>
+              <div class="cycle-stat"><span class="cycle-stat-label">Duration</span><span class="cycle-stat-value">14 days</span></div>
+            </div>
+            <div class="cycle-note">ℹ️ Next development phase starts after current cycle ends</div>
             <div class="cycle-posting-info">
               <div class="posting-header">📅 Posting Window</div>
               <div class="posting-dates"><span>${nextPostStart.toLocaleDateString('en-US',{month:'short',day:'numeric'})} - ${nextPostEnd.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span></div>
