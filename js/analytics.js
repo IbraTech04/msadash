@@ -15,6 +15,7 @@
     updateStatusChart();
     updateTimelineChart();
     updateTypeChart();
+    updateDepartmentChart();
     updateMetrics();
   }
 
@@ -46,6 +47,106 @@
     const typeCounts = {};
     window.currentEvents.forEach(event => { const t = event.request_type || 'Unknown'; typeCounts[t]=(typeCounts[t]||0)+1; });
     charts.type = new Chart(ctx, { type:'bar', data:{ labels:Object.keys(typeCounts), datasets:[{ label:'Count', data:Object.values(typeCounts), backgroundColor:'#007bff' }] }, options:{ responsive:true, maintainAspectRatio:false } });
+  }
+
+  async function updateDepartmentChart(){
+    const canvas = document.getElementById('departmentChart');
+    if (!canvas) {
+      console.warn('Department chart canvas not found');
+      return;
+    }
+    if (charts.department) charts.department.destroy();
+    const ctx = canvas.getContext('2d');
+    
+    try {
+      console.log('📊 Fetching department data...');
+      // Fetch department counts from the API
+      const departmentData = await window.apiService.getRequestCountByDepartment();
+      console.log('Department data received:', departmentData);
+      
+      if (!departmentData || departmentData.length === 0) {
+        console.warn('No department data available');
+        // Show empty chart with message
+        charts.department = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: ['No Data'],
+            datasets: [{
+              label: 'Total Requests',
+              data: [0],
+              backgroundColor: '#28a745'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false
+          }
+        });
+        return;
+      }
+      
+      // Map department IDs to readable names
+      const departmentNames = await Promise.all(
+        departmentData.map(async (dept) => {
+          const deptId = dept.requesterDepartmentid || dept.requesterDepartmentId;
+          if (!deptId) return 'Unknown';
+          try {
+            const roleName = await window.apiService.getRoleName(deptId);
+            return roleName || `Dept ${deptId}`;
+          } catch (error) {
+            return `Dept ${deptId}`;
+          }
+        })
+      );
+      
+      const requestCounts = departmentData.map(dept => dept.totalRequests);
+      
+      console.log('Creating department chart with:', { departmentNames, requestCounts });
+      
+      charts.department = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: departmentNames,
+          datasets: [{
+            label: 'Total Requests',
+            data: requestCounts,
+            backgroundColor: '#28a745',
+            borderColor: '#1e7e34',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                stepSize: 1
+              }
+            }
+          }
+        }
+      });
+    } catch (error) {
+      console.error('❌ Failed to load department chart:', error);
+      // Show error chart
+      charts.department = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Error'],
+          datasets: [{
+            label: 'Total Requests',
+            data: [0],
+            backgroundColor: '#dc3545'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false
+        }
+      });
+    }
   }
 
   function updateMetrics(){

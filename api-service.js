@@ -55,13 +55,13 @@ class ApiService {
       // Fix large integers in the raw JSON string before parsing
       // This regex finds all numeric values that could be IDs and wraps them in quotes
       const fixedText = text.replace(
-        /"(channelID|requesterID|assignedToID|additionalAsigneeID|requesterDepartmentID|id|userId|roleId|guildId)"\s*:\s*(\d{15,})/g,
+        /"(channelID|requesterID|assignedToID|additionalAsigneeID|requesterDepartmentID|requesterDepartmentid|id|userId|roleId|guildId)"\s*:\s*(\d{15,})/g,
         '"$1":"$2"'
       );
       
       // Also handle when they're in arrays
       const fixedTextArrays = fixedText.replace(
-        /"(channelID|requesterID|assignedToID|additionalAsigneeID|requesterDepartmentID|id|userId|roleId|guildId)"\s*:\s*\[([^\]]+)\]/g,
+        /"(channelID|requesterID|assignedToID|additionalAsigneeID|requesterDepartmentID|requesterDepartmentid|id|userId|roleId|guildId)"\s*:\s*\[([^\]]+)\]/g,
         (match, key, values) => {
           // Convert numeric values in arrays to strings
           const stringifiedValues = values.replace(/(\d{15,})/g, '"$1"');
@@ -209,6 +209,11 @@ class ApiService {
     return await this.request(`/api/requests/channel/${channelId}/department/${departmentId}`, {
       method: 'PATCH'
     });
+  }
+
+  // Get request count by department
+  async getRequestCountByDepartment() {
+    return await this.request('/api/requests/countByDepartment');
   }
 
   // ========== DISCORD MAPPING ==========

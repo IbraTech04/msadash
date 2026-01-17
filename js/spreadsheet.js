@@ -193,7 +193,7 @@
     data.sort((a,b) => new Date(a.posting_date) - new Date(b.posting_date));
     const groupsOrder = ['📥 In Queue','🔄 In Progress','⏳ Awaiting Posting','🚫 Blocked','✅ Done'];
     const groups = {}; data.forEach(ev => { const st = ev.status || 'Unknown'; (groups[st] = groups[st] || []).push(ev); });
-    const orderedStatuses = groupsOrder.filter(s => groups[s])
+    const orderedStatuses = groupsOrder.filter(s => groups[s] && s !== '✅ Done')
       .concat(Object.keys(groups).filter(s => !groupsOrder.includes(s) && !s.includes('Done')))
       .concat(groups['✅ Done'] ? ['✅ Done'] : []);
     const header = `
