@@ -8,6 +8,53 @@ class ApiService {
     this.timeout = window.MSA_CONFIG?.api?.timeout || 10000;
     this.currentUser = null;
     this.isAuthenticated = false;
+    this.jwtToken = null;
+    
+    // Load JWT from storage on initialization
+    this.loadToken();
+  }
+  
+  // ========== JWT TOKEN MANAGEMENT ==========
+  
+  // Load JWT from localStorage
+  loadToken() {
+    try {
+      this.jwtToken = localStorage.getItem('msa_jwt_token');
+      if (this.jwtToken) {
+        console.log('🔑 JWT token loaded from storage');
+      }
+    } catch (e) {
+      console.warn('Could not load JWT from storage:', e);
+    }
+  }
+  
+  // Store JWT in localStorage
+  setAuthToken(token) {
+    try {
+      this.jwtToken = token;
+      localStorage.setItem('msa_jwt_token', token);
+      console.log('🔑 JWT token stored');
+    } catch (e) {
+      console.error('Could not save JWT to storage:', e);
+    }
+  }
+  
+  // Get current JWT token
+  getAuthToken() {
+    return this.jwtToken;
+  }
+  
+  // Clear JWT token (for logout)
+  clearAuthToken() {
+    try {
+      this.jwtToken = null;
+      localStorage.removeItem('msa_jwt_token');
+      this.currentUser = null;
+      this.isAuthenticated = false;
+      console.log('🔑 JWT token cleared');
+    } catch (e) {
+      console.error('Could not clear JWT from storage:', e);
+    }
   }
 
   // ========== HTTP CLIENT ==========
@@ -24,6 +71,11 @@ class ApiService {
       },
       signal: controller.signal
     };
+
+    // Add JWT Authorization header if token is available
+    if (this.jwtToken) {
+      defaultOptions.headers['Authorization'] = `Bearer ${this.jwtToken}`;
+    }
 
     // Add API key if available (for bot operations)
     if (this.apiKey && options.useApiKey) {
@@ -45,6 +97,23 @@ class ApiService {
       }
 
       if (!response.ok) {
+        // Handle 401 Unauthorized - token expired or invalid
+        if (response.status === 401) {
+          console.warn('🔐 Token expired or invalid, clearing auth');
+          this.clearAuthToken();
+          // Trigger re-authentication if not on login page
+          if (!window.location.pathname.includes('auth-callback')) {
+            window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+          }
+        }
+        
+        // Handle 403 Forbidden - user not in required Discord server
+        if (response.status === 403) {
+          console.warn('🚫 Access forbidden - user may not be in required Discord server');
+          this.clearAuthToken();
+          window.dispatchEvent(new CustomEvent('auth:forbidden'));
+        }
+        
         const errorText = await response.text();
         throw new Error(`API Error ${response.status}: ${errorText || response.statusText}`);
       }
@@ -89,6 +158,14 @@ class ApiService {
   // Initiate Discord OAuth2 login
   login() {
     window.location.href = `${this.baseUrl}/oauth2/authorization/discord`;
+  }
+  
+  // Logout - clear token and reset state
+  logout() {
+    this.clearAuthToken();
+    console.log('🚪 User logged out');
+    // Optionally trigger UI update
+    window.dispatchEvent(new CustomEvent('auth:logout'));
   }
 
   // Check current authentication status

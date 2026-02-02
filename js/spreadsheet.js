@@ -295,4 +295,5 @@
   window.applySpreadsheetFilters = applySpreadsheetFilters;
   window.resetSpreadsheetFilters = resetSpreadsheetFilters;
   window.exportSpreadsheetCsv = exportSpreadsheetCsv;
+  window.updateSpreadsheetDeptSummary = updateSpreadsheetDeptSummary;
 })();

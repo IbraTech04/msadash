@@ -63,6 +63,10 @@
         <span class="nav-icon">🛠️</span>
         <span class="nav-text">Tools</span>
       </a>
+      <a href="#audit-log" class="nav-item" data-section="audit-log">
+        <span class="nav-icon">📜</span>
+        <span class="nav-text">Audit Log</span>
+      </a>
     </div>
     
     <div class="sidebar-footer">
@@ -500,6 +504,81 @@
         </div>
       </div>
     </section>
+
+    <!-- Audit Log Section -->
+    <section id="audit-log" class="content-section">
+      <div class="section-header">
+        <h2>📜 Audit Log</h2>
+        <div class="section-actions">
+          <button class="action-btn" onclick="window.MSA_AuditLog.exportCsv()">📤 Export CSV</button>
+          <button class="action-btn" onclick="window.MSA_AuditLog.refresh()">🔄 Refresh</button>
+        </div>
+      </div>
+
+      <!-- Audit Stats Overview -->
+      <div class="audit-stats-bar">
+        <div class="audit-stat">
+          <span class="stat-label">Total Events</span>
+          <span class="stat-value" id="audit-total-count">-</span>
+        </div>
+        <div class="audit-stat">
+          <span class="stat-label">Filtered</span>
+          <span class="stat-value" id="audit-filtered-count">-</span>
+        </div>
+        <div class="audit-type-breakdown" id="audit-type-breakdown"></div>
+      </div>
+
+      <!-- Filters -->
+      <div class="audit-filters">
+        <div class="filter-bar">
+          <div class="filter-bar-item">
+            <label for="audit-search">🔍 Search</label>
+            <input type="text" id="audit-search" class="filter-input" placeholder="Search events..." />
+          </div>
+          <div class="filter-bar-item">
+            <label for="audit-type-filter">Event Type</label>
+            <select id="audit-type-filter" class="filter-select">
+              <option value="">All Event Types</option>
+            </select>
+          </div>
+          <div class="filter-bar-item">
+            <label for="audit-entity-filter">Entity Type</label>
+            <select id="audit-entity-filter" class="filter-select">
+              <option value="">All Entity Types</option>
+            </select>
+          </div>
+          <div class="filter-bar-item">
+            <label for="audit-start-date">From Date</label>
+            <input type="date" id="audit-start-date" class="filter-input" />
+          </div>
+          <div class="filter-bar-item">
+            <label for="audit-end-date">To Date</label>
+            <input type="date" id="audit-end-date" class="filter-input" />
+          </div>
+          <div class="filter-bar-actions">
+            <button class="filter-btn secondary" onclick="window.MSA_AuditLog.resetFilters()">Reset</button>
+          </div>
+        </div>
+        <div class="audit-active-filters" id="audit-active-filters"></div>
+      </div>
+
+      <!-- Audit Table -->
+      <div class="audit-container">
+        <div id="audit-table-container" class="audit-table-wrapper">
+          <div class="audit-loading">
+            <span class="loading-spinner">🔄</span>
+            <p>Loading audit events...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div class="audit-pagination">
+        <button id="audit-prev-page" class="pagination-btn" disabled>← Previous</button>
+        <span id="audit-page-info" class="page-info">Page 1 of 1</span>
+        <button id="audit-next-page" class="pagination-btn" disabled>Next →</button>
+      </div>
+    </section>
   </main>
 
   <!-- Error/Success Toast -->
@@ -532,6 +611,7 @@
   <script src="/js/mini-calendar.js"></script>
   <script src="/js/analytics.js"></script>
   <script src="/js/kanban.js"></script>
+  <script src="/js/audit-log.js"></script>
   <script src="/js/namespace-adapter.js"></script>
   <script src="/script.js"></script>
 </body>
