@@ -29,8 +29,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupModeToggle();
   applyInitialTheme();
   
-  // Check if we're returning from a failed auth attempt
+  // Set up auth error handlers
+  setupAuthErrorHandlers();
+  
+  // Check if we're returning from OAuth with a JWT token
   const urlParams = new URLSearchParams(window.location.search);
+  const token = urlParams.get('token');
+  
+  if (token) {
+    // Store the JWT token
+    api.setAuthToken(token);
+    console.log('🔑 JWT token received from OAuth redirect');
+    // Remove token from URL to prevent leaking
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, document.title, cleanUrl);
+    showToast('Successfully logged in!', 'success');
+  }
+  
   if (urlParams.get('error') === 'auth_failed') {
     showToast('Authentication failed. Please ensure you are a member of the UTM MSA Discord server.', 'error');
     // Clean up URL
@@ -44,12 +59,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Show login screen instead of loading data
     showLoginScreen();
     return;
-  }
-  
-  // Show success message if we just logged in
-  if (urlParams.get('logged_in') === 'true') {
-    showToast('Welcome back! Loading your dashboard...', 'success');
-    window.history.replaceState({}, document.title, '/');
   }
   
   // Load data only if authenticated or in guest mode
@@ -84,6 +93,34 @@ async function checkAuthentication() {
     updateApiStatus('❌ Connection Error', 'error');
     return false;
   }
+}
+
+// Set up handlers for auth-related events
+function setupAuthErrorHandlers() {
+  // Handle 401 Unauthorized - token expired or invalid
+  window.addEventListener('auth:unauthorized', () => {
+    console.warn('🔐 Authentication expired or invalid');
+    showToast('Your session has expired. Please log in again.', 'warning');
+    showLoginScreen();
+  });
+  
+  // Handle 403 Forbidden - user not in required server
+  window.addEventListener('auth:forbidden', () => {
+    console.warn('🚫 Access forbidden');
+    showToast('Access denied. Please ensure you are a member of the UTM MSA Discord server.', 'error');
+    showLoginScreen();
+  });
+  
+  // Handle logout event
+  window.addEventListener('auth:logout', () => {
+    console.log('🚪 Logout event received');
+    showLoginScreen();
+    // Clear any cached data
+    window.currentEvents = [];
+    if (currentCalendar) {
+      currentCalendar.getEvents().forEach(event => event.remove());
+    }
+  });
 }
 
 function showLoginScreen() {
@@ -401,6 +438,11 @@ function openSection(sectionId) {
       break;
     case 'analytics':
       if (!window.isGuestMode) loadAnalytics();
+      break;
+    case 'audit-log':
+      if (!window.isGuestMode && window.MSA_AuditLog) {
+        window.MSA_AuditLog.init();
+      }
       break;
   }
   
@@ -940,6 +982,9 @@ function populateRequestFilters(events) {
 
   const depts = uniqueSorted(Array.from(byDept.keys()));
   rebuildDeptCheckboxes(depts, byDept);
+
+  // Also rebuild spreadsheet dept filter if in spreadsheet view
+  rebuildSpreadsheetDeptCheckboxes(depts, byDept);
 }
 
 function rebuildStatusCheckboxes(statuses, counts) {
@@ -1000,6 +1045,35 @@ function rebuildDeptCheckboxes(depts, counts) {
   updateDeptSummary();
 }
 
+function rebuildSpreadsheetDeptCheckboxes(depts, counts) {
+  const dropdown = document.getElementById('spreadsheet-dept-filter-dropdown');
+  if (!dropdown) return;
+  
+  // Store currently selected values
+  const selected = Array.from(dropdown.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+  
+  // Clear and rebuild
+  dropdown.innerHTML = '';
+  depts.forEach(dept => {
+    const label = document.createElement('label');
+    label.className = 'multi-select-option';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = dept;
+    checkbox.checked = selected.includes(dept);
+    checkbox.addEventListener('change', () => {
+      if (window.updateSpreadsheetDeptSummary) window.updateSpreadsheetDeptSummary();
+      if (window.applySpreadsheetFilters) window.applySpreadsheetFilters();
+    });
+    const span = document.createElement('span');
+    span.textContent = `${dept} (${counts.get(dept)})`;
+    label.appendChild(checkbox);
+    label.appendChild(span);
+    dropdown.appendChild(label);
+  });
+  if (window.updateSpreadsheetDeptSummary) window.updateSpreadsheetDeptSummary();
+}
+
 function rebuildSelect(id, options) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -1052,7 +1126,7 @@ function populateSpreadsheetFilters(events) {
   })));
 
   const depts = uniqueSorted(Array.from(byDept.keys()));
-  rebuildSelect('spreadsheet-dept-filter', depts.map(d => ({value:d, label:`${d} (${byDept.get(d)})`})));
+  rebuildSpreadsheetDeptCheckboxes(depts, byDept);
 }
 
 function updateStatusSummary() {
@@ -1106,7 +1180,14 @@ function resetRequestFilters() {
     updateStatusSummary();
   }
   
-  ['type-filter','dept-filter','request-search'].forEach(id => {
+  // Reset department checkboxes
+  const deptDropdown = document.getElementById('dept-filter-dropdown');
+  if (deptDropdown) {
+    deptDropdown.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    updateDeptSummary();
+  }
+  
+  ['type-filter','request-search'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';

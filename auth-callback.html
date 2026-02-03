@@ -53,67 +53,56 @@
 
   <script>
     // This page handles the OAuth callback from Discord
-    // The backend returns JSON at /api/auth/success or /api/auth/failure
+    // The backend redirects with a token query parameter after successful authentication
     
     async function handleCallback() {
       const statusEl = document.getElementById('status');
       const messageEl = document.getElementById('message');
       
       try {
-        const path = window.location.pathname;
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+        const error = urlParams.get('error');
         
-        // Try to fetch the current page to see if it's a success or failure JSON response
-        // The backend should have already set the session cookie
-        const response = await fetch(window.location.href, {
-          credentials: 'include'
-        });
-        
-        const data = await response.json();
-        
-        if (data.status === 'success' || path.includes('/api/auth/success')) {
-          // Success! The session cookie is now set
-          statusEl.textContent = `✅ Welcome, ${data.user?.username || 'User'}!`;
+        if (token) {
+          // Success! We received a JWT token
+          statusEl.textContent = '✅ Authentication successful!';
           messageEl.textContent = 'Redirecting to dashboard...';
           
+          console.log('🔑 JWT token received from backend');
           
           // Wait a moment for user to see success message
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          await new Promise(resolve => setTimeout(resolve, 1000));
           
-          // Redirect back to main page with success indicator
-          window.location.href = '/?logged_in=true';
-        } else if (data.status === 'error' || path.includes('/api/auth/failure')) {
+          // Redirect to main page with token in query param
+          // The main app will capture and store the token
+          window.location.href = `/?token=${encodeURIComponent(token)}`;
+        } else if (error === 'auth_failed') {
           // Authentication failed
           statusEl.textContent = '❌ Authentication failed';
-          messageEl.textContent = data.message || 'You may not be a member of the Marketing Command Centre. Redirecting...';
+          messageEl.textContent = 'You may not be a member of the Marketing Command Centre. Redirecting...';
           messageEl.className = 'error';
           
-          console.error('❌ Authentication failed:', data);
+          console.error('❌ Authentication failed');
           
           await new Promise(resolve => setTimeout(resolve, 2000));
           window.location.href = '/?error=auth_failed';
         } else {
-          // Unknown state - just redirect home
-          console.warn('Unknown auth state, redirecting home');
+          // No token and no error - unexpected state
+          console.warn('No token or error in callback, redirecting home');
+          statusEl.textContent = '⚠️ Unexpected response';
+          messageEl.textContent = 'Redirecting to home page...';
+          await new Promise(resolve => setTimeout(resolve, 1500));
           window.location.href = '/';
         }
       } catch (error) {
         console.error('Callback error:', error);
         
-        // If we're on the success page but got an error parsing JSON,
-        // it might mean we're already authenticated
-        const path = window.location.pathname;
-        if (path.includes('/api/auth/success')) {
-          statusEl.textContent = '✅ Authentication successful!';
-          messageEl.textContent = 'Redirecting to dashboard...';
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          window.location.href = '/?logged_in=true';
-        } else {
-          statusEl.textContent = '❌ An error occurred';
-          messageEl.textContent = 'Redirecting to home page...';
-          messageEl.className = 'error';
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          window.location.href = '/';
-        }
+        statusEl.textContent = '❌ An error occurred';
+        messageEl.textContent = 'Redirecting to home page...';
+        messageEl.className = 'error';
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        window.location.href = '/';
       }
     }
     

@@ -95,9 +95,21 @@
           <div class="user-menu-email">${user.email || 'No email'}</div>
         </div>
       </div>
-      <button class="user-menu-button" onclick="window.apiService.login()">Switch Account</button>`;
+      <button class="user-menu-button" onclick="window.apiService.login()">Switch Account</button>
+      <button class="user-menu-button" onclick="window.logout()" style="background: #dc3545;">Logout</button>`;
     document.body.appendChild(menu);
     setTimeout(() => menu.remove(), 5000);
+  }
+  
+  function logout() {
+    const api = window.apiService || window.api;
+    console.log('🚪 Logging out...');
+    api.logout();
+    showLoginScreen();
+    updateUserGreeting(null);
+    if (typeof window.showToast === 'function') {
+      window.showToast('You have been logged out', 'info');
+    }
   }
 
   window.checkAuthentication = checkAuthentication;
@@ -106,6 +118,7 @@
   window.initiateLogin = initiateLogin;
   window.updateUserGreeting = updateUserGreeting;
   window.showUserMenu = showUserMenu;
+  window.logout = logout;
   window.continueAsGuest = continueAsGuest; // Export for global access
   
   function continueAsGuest() {
