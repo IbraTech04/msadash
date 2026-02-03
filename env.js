@@ -18,8 +18,6 @@ window.MSA_ENV = {
   ENABLE_ANALYTICS: false
 };
 
-window.MSA_ENV.API_URL = "http://localhost:8080"; // Local development API URL
-
 // Example: To set a custom API URL (e.g., ngrok tunnel), uncomment and modify this line:
 // window.MSA_ENV.API_URL = "https://your-ngrok-url.ngrok-free.app";
 
