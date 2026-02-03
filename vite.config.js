@@ -68,6 +68,7 @@ export default defineConfig({
           'js/mini-calendar.js',
           'js/analytics.js',
           'js/kanban.js',
+          'js/audit-log.js',
           'js/namespace-adapter.js',
           'msa_logo.png',
           'msa_logo_white.png'
