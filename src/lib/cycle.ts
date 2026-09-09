@@ -8,7 +8,7 @@ import type { CycleInfo, DevelopmentCycle } from '@/types';
 // posted during the following 14-day window.
 // TODO confirm cycle math with the backend (/api/workload/cycle-info is the
 // source of truth when available; this is the local fallback).
-const CYCLE_START_DATE = '2026-08-31'; // August 31st, 2026
+const CYCLE_START_DATE = '2026-09-14'; // Collection runs the fortnight before, Aug 31 - Sep 13
 export const CYCLE_LENGTH_DAYS = 14;
 
 export interface CycleWindow {
